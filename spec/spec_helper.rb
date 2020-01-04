@@ -1,1 +1,1 @@
-require File.expand_path("../../lib/lumberjack_json_device.rb", __FILE__)
+require_relative "../lib/lumberjack_json_device.rb"
