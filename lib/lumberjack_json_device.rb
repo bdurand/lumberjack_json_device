@@ -23,7 +23,7 @@ module Lumberjack
   #
   # You can create a nested JSON structure by specifying an array as the JSON key.
   class JsonDevice < Device
-    
+
     DEFAULT_MAPPING = {
       time: "time",
       severity: "severity",
@@ -118,7 +118,7 @@ module Lumberjack
       elsif key.respond_to?(:call)
         hash = key.call(value)
         if hash.is_a?(Hash)
-          data.merge!(Lumberjack::Tags.stringify_keys(hash))
+          deep_merge!(data, Lumberjack::Tags.stringify_keys(hash))
         end
       else
         data[key] = value unless key.nil?
@@ -132,6 +132,18 @@ module Lumberjack
       formatter.add(Object, object_formatter)
       formatter.add(Enumerable, Formatter::StructuredFormatter.new(formatter))
       formatter.add(Exception, Formatter::InspectFormatter.new)
+    end
+
+    def deep_merge!(hash, other_hash, &block)
+      hash.merge!(other_hash) do |key, this_val, other_val|
+        if this_val.is_a?(Hash) && other_val.is_a?(Hash)
+          deep_merge(this_val, other_val, &block)
+        elsif block_given?
+          block.call(key, this_val, other_val)
+        else
+          other_val
+        end
+      end
     end
 
   end

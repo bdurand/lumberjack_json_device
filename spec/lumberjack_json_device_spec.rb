@@ -93,14 +93,14 @@ describe Lumberjack::JsonDevice do
 
     it "should be able to map with a proc" do
       mapping = {
-        time: "timestamp",
+        time: lambda { |t| {timestamp: t.to_i} },
         severity: "level",
         message: lambda { |m| {text: m, size: m.size}}
       }
       device = Lumberjack::JsonDevice.new(output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
-        "timestamp" => entry.time,
+        "timestamp" => entry.time.to_i,
         "level" => entry.severity_label,
         "text" => entry.message,
         "size" => entry.message.size
