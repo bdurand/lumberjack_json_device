@@ -131,7 +131,6 @@ module Lumberjack
       formatter.add(String, object_formatter)
       formatter.add(Object, object_formatter)
       formatter.add(Enumerable, Formatter::StructuredFormatter.new(formatter))
-      formatter.add(Exception, Formatter::InspectFormatter.new)
     end
 
     def deep_merge!(hash, other_hash, &block)
