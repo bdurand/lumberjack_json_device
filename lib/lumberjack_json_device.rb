@@ -33,9 +33,11 @@ module Lumberjack
       tags: "tags"
     }.freeze
 
+    DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%6N%z"
+
     attr_accessor :formatter
 
-    def initialize(stream_or_device, mapping: DEFAULT_MAPPING, formatter: nil)
+    def initialize(stream_or_device, mapping: DEFAULT_MAPPING, formatter: nil, datetime_format: nil)
       if stream_or_device.is_a?(Device)
         @device = stream_or_device
       else
@@ -53,7 +55,13 @@ module Lumberjack
       @message_key = @custom_keys.delete(:message)
       @tags_key = @custom_keys.delete(:tags)
 
-      @formatter = (formatter || default_formatter)
+      if formatter
+        @formatter = formatter
+      else
+        @formatter = default_formatter
+        datetime_format = DEFAULT_TIME_FORMAT if datetime_format.nil?
+      end
+      add_datetime_formatter!(datetime_format) unless datetime_format.nil?
     end
 
     def write(entry)
@@ -67,11 +75,11 @@ module Lumberjack
     end
 
     def datetime_format
-      @time_formatter.format if @time_formatter
+      @datetime_format
     end
 
     def datetime_format=(format)
-      @time_formatter = Lumberjack::Formatter::DateTimeFormatter.new(format)
+      add_datetime_formatter!(format)
     end
 
     def entry_as_json(entry)
@@ -131,6 +139,20 @@ module Lumberjack
       formatter.add(String, object_formatter)
       formatter.add(Object, object_formatter)
       formatter.add(Enumerable, Formatter::StructuredFormatter.new(formatter))
+      formatter
+    end
+
+    def add_datetime_formatter!(datetime_format)
+      if datetime_format
+        @datetime_format = datetime_format
+        time_formatter = Lumberjack::Formatter::DateTimeFormatter.new(datetime_format)
+        formatter.add(Time, time_formatter)
+        formatter.add(Date, time_formatter)
+      else
+        @datetime_format = nil
+        formatter.remove(Time)
+        formatter.remove(Date)
+      end
     end
 
     def deep_merge!(hash, other_hash, &block)

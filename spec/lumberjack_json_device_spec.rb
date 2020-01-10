@@ -10,7 +10,7 @@ describe Lumberjack::JsonDevice do
       device = Lumberjack::JsonDevice.new(output)
       data = device.entry_as_json(entry)
       expect(data).to eq({
-        "time" => entry.time,
+        "time" => entry.time.strftime('%Y-%m-%dT%H:%M:%S.%6N%z'),
         "severity" => entry.severity_label,
         "progname" => entry.progname,
         "pid" => entry.pid,
@@ -40,7 +40,7 @@ describe Lumberjack::JsonDevice do
       device = Lumberjack::JsonDevice.new(output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
-        "timestamp" => entry.time,
+        "timestamp" => entry.time.strftime('%Y-%m-%dT%H:%M:%S.%6N%z'),
         "level" => entry.severity_label,
         "app" => entry.progname,
         "pid" => entry.pid,
@@ -62,7 +62,7 @@ describe Lumberjack::JsonDevice do
       device = Lumberjack::JsonDevice.new(output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
-        "timestamp" => entry.time,
+        "timestamp" => entry.time.strftime('%Y-%m-%dT%H:%M:%S.%6N%z'),
         "level" => entry.severity_label,
         "app" => entry.progname,
         "pid" => entry.pid,
@@ -84,7 +84,7 @@ describe Lumberjack::JsonDevice do
       device = Lumberjack::JsonDevice.new(output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
-        "timestamp" => entry.time,
+        "timestamp" => entry.time.strftime('%Y-%m-%dT%H:%M:%S.%6N%z'),
         "level" => entry.severity_label,
         "process" => { "name" => entry.progname, "pid" => entry.pid },
         "payload" => { "message" => entry.message, "tags" => entry.tags }
@@ -134,20 +134,26 @@ describe Lumberjack::JsonDevice do
   describe "formatter" do
     it "should apply a formatter to the data objects" do
       formatter = Lumberjack::Formatter.new
-      formatter.add(Time) { |obj| "#{obj}!" }
-      device = Lumberjack::JsonDevice.new(output, formatter: formatter, mapping: {time: "time", message: "message"})
+      formatter.add(String) { |obj| "#{obj}!" }
+      device = Lumberjack::JsonDevice.new(output, formatter: formatter, mapping: {time: "time", message: "message", foo: "foo"})
       device.write(entry)
       line = output.string.chomp
-      expect(line).to eq MultiJson.dump("time" => "#{entry.time}!", "message" => "message")
+      expect(line).to eq MultiJson.dump("time" => "#{entry.time}", "message" => "message!", "foo" => "bar!")
     end
   end
 
   describe "datetime_format" do
     it "should get and set the datetime_format" do
       device = Lumberjack::JsonDevice.new(output, mapping: {time: "time", message: "message"})
-      expect(device.datetime_format).to eq nil
+      expect(device.datetime_format).to eq "%Y-%m-%dT%H:%M:%S.%6N%z"
       device.datetime_format = "%Y-%m-%d--%H.%M.%S"
       expect(device.datetime_format).to eq "%Y-%m-%d--%H.%M.%S"
+    end
+
+    it "should get and set the datetime_format in the constructor" do
+      device = Lumberjack::JsonDevice.new(output, mapping: {time: "time", message: "message"}, datetime_format: "%Y-%m-%d")
+      expect(device.datetime_format).to eq "%Y-%m-%d"
+      expect(device.datetime_format).to eq "%Y-%m-%d"
     end
 
     it "should apply the datetime_format to all datetime fields in the JSON" do
