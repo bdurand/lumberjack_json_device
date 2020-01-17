@@ -170,4 +170,16 @@ describe Lumberjack::JsonDevice do
     end
   end
 
+  describe "mapping" do
+    it "should be able to change the mapping" do
+      device = Lumberjack::JsonDevice.new(output, mapping: { message: "message" })
+      data = device.entry_as_json(entry)
+      expect(data).to eq({"message" => entry.message})
+
+      device.mapping = device.mapping.merge(message: "text", severity: "level")
+      data = device.entry_as_json(entry)
+      expect(data).to eq({"text" => entry.message, "level" => "INFO"})
+    end
+  end
+
 end

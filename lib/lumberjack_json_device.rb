@@ -2,6 +2,7 @@
 
 require 'lumberjack'
 require 'multi_json'
+require 'thread'
 
 module Lumberjack
   # This Lumberjack device logs output to another device as JSON formatted text with one document per line.
@@ -36,24 +37,18 @@ module Lumberjack
     DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%6N%z"
 
     attr_accessor :formatter
+    attr_reader :mapping
 
     def initialize(stream_or_device, mapping: DEFAULT_MAPPING, formatter: nil, datetime_format: nil)
+      @mutex = Mutex.new
+
       if stream_or_device.is_a?(Device)
         @device = stream_or_device
       else
         @device = Writer.new(stream_or_device)
       end
 
-      @custom_keys = {}
-      mapping.each do |key, value|
-        @custom_keys[key.to_sym] = value
-      end
-      @time_key = @custom_keys.delete(:time)
-      @severity_key = @custom_keys.delete(:severity)
-      @progname_key = @custom_keys.delete(:progname)
-      @pid_key = @custom_keys.delete(:pid)
-      @message_key = @custom_keys.delete(:message)
-      @tags_key = @custom_keys.delete(:tags)
+      self.mapping = mapping
 
       if formatter
         @formatter = formatter
@@ -78,10 +73,32 @@ module Lumberjack
       @datetime_format
     end
 
+    # Set the datetime format for the log timestamp.
     def datetime_format=(format)
       add_datetime_formatter!(format)
     end
 
+    # Set the mapping for how to map an entry to a JSON object.
+    def mapping=(mapping)
+      @mutex.synchronize do
+        keys = {}
+        mapping.each do |key, value|
+          keys[key.to_sym] = value
+        end
+
+        @time_key = keys.delete(:time)
+        @severity_key = keys.delete(:severity)
+        @progname_key = keys.delete(:progname)
+        @pid_key = keys.delete(:pid)
+        @message_key = keys.delete(:message)
+        @tags_key = keys.delete(:tags)
+        @custom_keys = keys
+        @mapping = mapping
+      end
+      nil
+    end
+
+    # Convert a Lumberjack::LogEntry to a Hash using the specified field mapping.
     def entry_as_json(entry)
       data = {}
       set_attribute(data, @time_key, entry.time) unless @time_key.nil?
