@@ -127,6 +127,8 @@ module Lumberjack
     private
 
     def set_attribute(data, key, value)
+      return if value.nil?
+
       if (value.is_a?(Time) || value.is_a?(DateTime)) && @time_formatter
         value = @time_formatter.call(value)
       end
