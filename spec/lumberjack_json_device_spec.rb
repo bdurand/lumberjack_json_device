@@ -157,6 +157,17 @@ describe Lumberjack::JsonDevice do
       data = device.entry_as_json(entry)
       expect(lines).to eq [MultiJson.dump(data)] * 2
     end
+
+    it "should not write out empty log messages" do
+      blank_entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "", "test", 12345, "foo.bar" => "boo")
+      nil_entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, nil, "test", 12345, "foo.bar" => "boo")
+      device = Lumberjack::JsonDevice.new(output)
+      device.write(blank_entry)
+      device.write(nil_entry)
+      device.flush
+      lines = output.string.chomp.split(Lumberjack::LINE_SEPARATOR)
+      expect(lines).to eq []
+    end
   end
 
   describe "formatter" do

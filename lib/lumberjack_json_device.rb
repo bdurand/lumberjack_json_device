@@ -60,6 +60,7 @@ module Lumberjack
     end
 
     def write(entry)
+      return if entry.message.nil? || entry.message == ""
       data = entry_as_json(entry)
       json = MultiJson.dump(data)
       @device.write(json)
