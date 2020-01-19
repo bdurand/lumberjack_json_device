@@ -26,12 +26,12 @@ module Lumberjack
   class JsonDevice < Device
 
     DEFAULT_MAPPING = {
-      time: "time",
-      severity: "severity",
-      progname: "progname",
-      pid: "pid",
-      message: "message",
-      tags: "tags"
+      time: true,
+      severity: true,
+      progname: true,
+      pid: true,
+      message: true,
+      tags: true
     }.freeze
 
     DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%6N%z"
@@ -83,7 +83,11 @@ module Lumberjack
       @mutex.synchronize do
         keys = {}
         mapping.each do |key, value|
-          keys[key.to_sym] = value
+          if value == true
+            value = key.to_s.split(".")
+            value = value.first if value.size == 1
+          end
+          keys[key.to_sym] = value if value
         end
 
         @time_key = keys.delete(:time)
@@ -96,6 +100,14 @@ module Lumberjack
         @mapping = mapping
       end
       nil
+    end
+
+    def map(field_mapping)
+      new_mapping = {}
+      field_mapping.each do |key, value|
+        new_mapping[key.to_sym] = value
+      end
+      self.mapping = mapping.merge(new_mapping)
     end
 
     # Convert a Lumberjack::LogEntry to a Hash using the specified field mapping.

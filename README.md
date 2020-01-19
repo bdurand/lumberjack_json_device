@@ -76,6 +76,22 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
 {"timestamp": 1578125375588, "level": "INFO", "message": "test"}
 ```
 
+Finally, you can specify `true` in the mapping as a short cut to map the field to the same name. If the field name contains periods, it will be mapped to a nested structure.
+
+```ruby
+device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
+  "message" => true,
+  "http.status" => true,
+  "http.method" => true,
+  "http.path" => true
+})
+```
+
+```json
+{"message": "test", "http": {"status": 200, "method": "GET", "path": "/resource"}}
+```
+
+
 ## Data Formatting
 
 The device will have a `Lumberjack::Formatter` that will be used to format objects before serializing them as JSON. You can add additional formatters for classes to the default formatter, or supply a custom one when creating the device.

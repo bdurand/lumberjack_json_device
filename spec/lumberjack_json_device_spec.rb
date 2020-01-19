@@ -118,6 +118,22 @@ describe Lumberjack::JsonDevice do
         "size" => entry.message.size
       })
     end
+
+    it "should use a 1:1 mapping if the mapped value is true" do
+      mapping = {
+        severity: true,
+        message: true,
+        "foo.bar" => true
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo.bar" => "boo")
+      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({
+        "severity" => entry.severity_label,
+        "message" => entry.message,
+        "foo" => {"bar" => "boo"}
+      })
+    end
   end
 
   describe "device wrapping" do
@@ -191,6 +207,20 @@ describe Lumberjack::JsonDevice do
       device.mapping = device.mapping.merge(message: "text", severity: "level")
       data = device.entry_as_json(entry)
       expect(data).to eq({"text" => entry.message, "level" => "INFO"})
+    end
+
+    it "should be able to add to the mapping" do
+      device = Lumberjack::JsonDevice.new(output, mapping: { message: "message" })
+      device.mapping = device.map(message: "text", severity: "level")
+      data = device.entry_as_json(entry)
+      expect(data).to eq({"text" => entry.message, "level" => "INFO"})
+    end
+
+    it "should remove from the mapping with falsey value" do
+      device = Lumberjack::JsonDevice.new(output, mapping: { message: "message" })
+      device.mapping = device.map(message: false, severity: "level")
+      data = device.entry_as_json(entry)
+      expect(data).to eq({"level" => "INFO"})
     end
   end
 
