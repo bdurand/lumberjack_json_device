@@ -106,3 +106,5 @@ You can also specify the `datetime_format` that will be used to serialize Time a
 ```ruby
 device.datetime_format = "%Y-%m-%dT%H:%M:%S.%3N"
 ```
+
+Log entries with no message will not be written to the log.
