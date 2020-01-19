@@ -189,7 +189,7 @@ module Lumberjack
     def deep_merge!(hash, other_hash, &block)
       hash.merge!(other_hash) do |key, this_val, other_val|
         if this_val.is_a?(Hash) && other_val.is_a?(Hash)
-          deep_merge(this_val, other_val, &block)
+          deep_merge!(this_val, other_val, &block)
         elsif block_given?
           block.call(key, this_val, other_val)
         else
