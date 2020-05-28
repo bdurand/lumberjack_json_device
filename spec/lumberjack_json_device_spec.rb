@@ -28,16 +28,28 @@ describe Lumberjack::JsonDevice do
       expect(data).to eq({"message" => entry.message})
     end
 
-    it "should not include nil values" do
+    it "should not include nil tags" do
       mapping = {
         message: "message",
         thread: ["logger", "thread"],
         tags: "tags"
       }
-      Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar", "baz" => "boo", "missing" => nil)
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar", "baz" => nil)
       device = Lumberjack::JsonDevice.new(output, mapping: mapping)
       data = device.entry_as_json(entry)
-      expect(data).to eq({"message" => entry.message, "tags" => {"foo" => "bar", "baz" => "boo"}})
+      expect(data).to eq({"message" => entry.message, "tags" => {"foo" => "bar", "baz" => nil}})
+    end
+
+    it "should include false tags" do
+      mapping = {
+        message: "message",
+        thread: ["logger", "thread"],
+        tags: "tags"
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar", "baz" => false)
+      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({"message" => entry.message, "tags" => {"foo" => "bar", "baz" => false}})
     end
 
     it "should be able to map to custom JSON fields" do
