@@ -1,1 +1,1 @@
-require_relative "../lib/lumberjack_json_device.rb"
+require_relative "../lib/lumberjack_json_device"

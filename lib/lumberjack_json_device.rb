@@ -1,8 +1,7 @@
 # frozen_string_literal: true
 
-require 'lumberjack'
-require 'multi_json'
-require 'thread'
+require "lumberjack"
+require "multi_json"
 
 module Lumberjack
   # This Lumberjack device logs output to another device as JSON formatted text with one document per line.
@@ -24,7 +23,6 @@ module Lumberjack
   #
   # You can create a nested JSON structure by specifying an array as the JSON key.
   class JsonDevice < Device
-
     DEFAULT_MAPPING = {
       time: true,
       severity: true,
@@ -42,10 +40,10 @@ module Lumberjack
     def initialize(stream_or_device, mapping: DEFAULT_MAPPING, formatter: nil, datetime_format: nil)
       @mutex = Mutex.new
 
-      if stream_or_device.is_a?(Device)
-        @device = stream_or_device
+      @device = if stream_or_device.is_a?(Device)
+        stream_or_device
       else
-        @device = Writer.new(stream_or_device)
+        Writer.new(stream_or_device)
       end
 
       self.mapping = mapping
@@ -70,9 +68,7 @@ module Lumberjack
       @device.flush
     end
 
-    def datetime_format
-      @datetime_format
-    end
+    attr_reader :datetime_format
 
     # Set the datetime format for the log timestamp.
     def datetime_format=(format)
@@ -100,7 +96,6 @@ module Lumberjack
         @custom_keys = keys
         @mapping = mapping
       end
-      nil
     end
 
     def map(field_mapping)
@@ -191,13 +186,12 @@ module Lumberjack
       hash.merge!(other_hash) do |key, this_val, other_val|
         if this_val.is_a?(Hash) && other_val.is_a?(Hash)
           deep_merge!(this_val, other_val, &block)
-        elsif block_given?
+        elsif block
           block.call(key, this_val, other_val)
         else
           other_val
         end
       end
     end
-
   end
 end

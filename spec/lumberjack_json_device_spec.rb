@@ -1,16 +1,15 @@
-require 'spec_helper'
+require "spec_helper"
 
 describe Lumberjack::JsonDevice do
-
   let(:output) { StringIO.new }
-  let(:entry){ Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar", "baz" => "boo") }
+  let(:entry) { Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar", "baz" => "boo") }
 
   describe "entry_as_json" do
     it "should have a default mapping of the entry fields" do
       device = Lumberjack::JsonDevice.new(output)
       data = device.entry_as_json(entry)
       expect(data).to eq({
-        "time" => entry.time.strftime('%Y-%m-%dT%H:%M:%S.%6N%z'),
+        "time" => entry.time.strftime("%Y-%m-%dT%H:%M:%S.%6N%z"),
         "severity" => entry.severity_label,
         "progname" => entry.progname,
         "pid" => entry.pid,
@@ -64,7 +63,7 @@ describe Lumberjack::JsonDevice do
       device = Lumberjack::JsonDevice.new(output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
-        "timestamp" => entry.time.strftime('%Y-%m-%dT%H:%M:%S.%6N%z'),
+        "timestamp" => entry.time.strftime("%Y-%m-%dT%H:%M:%S.%6N%z"),
         "level" => entry.severity_label,
         "app" => entry.progname,
         "pid" => entry.pid,
@@ -86,12 +85,12 @@ describe Lumberjack::JsonDevice do
       device = Lumberjack::JsonDevice.new(output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
-        "timestamp" => entry.time.strftime('%Y-%m-%dT%H:%M:%S.%6N%z'),
+        "timestamp" => entry.time.strftime("%Y-%m-%dT%H:%M:%S.%6N%z"),
         "level" => entry.severity_label,
         "app" => entry.progname,
         "pid" => entry.pid,
         "message" => entry.message,
-        "payload" => { "baz" => "boo" },
+        "payload" => {"baz" => "boo"},
         "custom" => "bar"
       })
     end
@@ -108,10 +107,10 @@ describe Lumberjack::JsonDevice do
       device = Lumberjack::JsonDevice.new(output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
-        "timestamp" => entry.time.strftime('%Y-%m-%dT%H:%M:%S.%6N%z'),
+        "timestamp" => entry.time.strftime("%Y-%m-%dT%H:%M:%S.%6N%z"),
         "level" => entry.severity_label,
-        "process" => { "name" => entry.progname, "pid" => entry.pid },
-        "payload" => { "message" => entry.message, "tags" => entry.tags }
+        "process" => {"name" => entry.progname, "pid" => entry.pid},
+        "payload" => {"message" => entry.message, "tags" => entry.tags}
       })
     end
 
@@ -119,7 +118,7 @@ describe Lumberjack::JsonDevice do
       mapping = {
         time: lambda { |t| {timestamp: t.to_i} },
         severity: "level",
-        message: lambda { |m| {text: m, size: m.size}}
+        message: lambda { |m| {text: m, size: m.size} }
       }
       device = Lumberjack::JsonDevice.new(output, mapping: mapping)
       data = device.entry_as_json(entry)
@@ -133,8 +132,8 @@ describe Lumberjack::JsonDevice do
 
     it "should use a 1:1 mapping if the mapped value is true" do
       mapping = {
-        severity: true,
-        message: true,
+        :severity => true,
+        :message => true,
         "foo.bar" => true
       }
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo.bar" => "boo")
@@ -186,10 +185,11 @@ describe Lumberjack::JsonDevice do
     it "should apply a formatter to the data objects" do
       formatter = Lumberjack::Formatter.new
       formatter.add(String) { |obj| "#{obj}!" }
+      formatter.add(Time) { |obj| obj.iso8601 }
       device = Lumberjack::JsonDevice.new(output, formatter: formatter, mapping: {time: "time", message: "message", foo: "foo"})
       device.write(entry)
       line = output.string.chomp
-      expect(line).to eq MultiJson.dump("time" => "#{entry.time}", "message" => "message!", "foo" => "bar!")
+      expect(line).to eq MultiJson.dump("time" => entry.time.iso8601, "message" => "message!", "foo" => "bar!")
     end
   end
 
@@ -223,7 +223,7 @@ describe Lumberjack::JsonDevice do
 
   describe "mapping" do
     it "should be able to change the mapping" do
-      device = Lumberjack::JsonDevice.new(output, mapping: { message: "message" })
+      device = Lumberjack::JsonDevice.new(output, mapping: {message: "message"})
       data = device.entry_as_json(entry)
       expect(data).to eq({"message" => entry.message})
 
@@ -233,18 +233,17 @@ describe Lumberjack::JsonDevice do
     end
 
     it "should be able to add to the mapping" do
-      device = Lumberjack::JsonDevice.new(output, mapping: { message: "message" })
+      device = Lumberjack::JsonDevice.new(output, mapping: {message: "message"})
       device.mapping = device.map(message: "text", severity: "level")
       data = device.entry_as_json(entry)
       expect(data).to eq({"text" => entry.message, "level" => "INFO"})
     end
 
     it "should remove from the mapping with falsey value" do
-      device = Lumberjack::JsonDevice.new(output, mapping: { message: "message" })
+      device = Lumberjack::JsonDevice.new(output, mapping: {message: "message"})
       device.mapping = device.map(message: false, severity: "level")
       data = device.entry_as_json(entry)
       expect(data).to eq({"level" => "INFO"})
     end
   end
-
 end
