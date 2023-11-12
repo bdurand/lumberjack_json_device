@@ -108,3 +108,31 @@ device.datetime_format = "%Y-%m-%dT%H:%M:%S.%3N"
 ```
 
 Log entries with no message will not be written to the log.
+
+## Installation
+
+Add this line to your application's Gemfile:
+
+```ruby
+gem 'lumberjack_json_device'
+```
+
+And then execute:
+```bash
+$ bundle
+```
+
+Or install it yourself as:
+```bash
+$ gem install lumberjack_json_device
+```
+
+## Contributing
+
+Open a pull request on GitHub.
+
+Please use the [standardrb](https://github.com/testdouble/standard) syntax and lint your code with `standardrb --fix` before submitting.
+
+## License
+
+The gem is available as open source under the terms of the [MIT License](https://opensource.org/licenses/MIT).
