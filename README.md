@@ -3,6 +3,7 @@
 [![Continuous Integration](https://github.com/bdurand/lumberjack_json_device/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/bdurand/lumberjack_json_device/actions/workflows/continuous_integration.yml)
 [![Regression Test](https://github.com/bdurand/lumberjack_json_device/actions/workflows/regression_test.yml/badge.svg)](https://github.com/bdurand/lumberjack_json_device/actions/workflows/regression_test.yml)
 [![Ruby Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://github.com/testdouble/standard)
+[![Gem Version](https://badge.fury.io/rb/lumberjack_json_device.svg)](https://badge.fury.io/rb/lumberjack_json_device)
 
 This gem provides a logging device for the [lumberjack](https://github.com/bdurand/lumberjack) gem that will log JSON formatted output to a stream with one JSON document per line. This can be used as part of a log processing pipeline to ship the log to a structured data store or logging service.
 
