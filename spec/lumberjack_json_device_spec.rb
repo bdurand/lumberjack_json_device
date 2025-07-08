@@ -132,17 +132,122 @@ describe Lumberjack::JsonDevice do
 
     it "should use a 1:1 mapping if the mapped value is true" do
       mapping = {
-        :severity => true,
-        :message => true,
-        "foo.bar" => true
+        severity: true,
+        message: true,
+        "foo.bar": true,
+        tags: true
       }
-      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo.bar" => "boo")
+      tags = {
+        "foo" => {"bar" => "boo"},
+        "baz" => "bip"
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
       device = Lumberjack::JsonDevice.new(output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
         "severity" => entry.severity_label,
         "message" => entry.message,
-        "foo" => {"bar" => "boo"}
+        "foo" => {"bar" => "boo"},
+        "tags" => {
+          "baz" => "bip"
+        }
+      })
+    end
+
+    it "should nest tags in the JSON document using dot syntax" do
+      mapping = {
+        severity: true,
+        message: true,
+        tags: true
+      }
+      tags = {
+        "bip" => "bap",
+        "foo.bar" => "boo",
+        "mip" => "map"
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
+      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({
+        "severity" => entry.severity_label,
+        "message" => entry.message,
+        "tags" => {
+          "bip" => "bap",
+          "foo" => {"bar" => "boo"},
+          "mip" => "map"
+        }
+      })
+    end
+
+    it "converts tags names to strings" do
+      mapping = {
+        severity: true,
+        message: true,
+        tags: true
+      }
+      tags = {
+        "bip" => "bap",
+        :"foo.bar" => "boo",
+        "mip" => "map"
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
+      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({
+        "severity" => entry.severity_label,
+        "message" => entry.message,
+        "tags" => {
+          "bip" => "bap",
+          "foo" => {"bar" => "boo"},
+          "mip" => "map"
+        }
+      })
+    end
+
+    it "dereferences nested tags" do
+      mapping = {
+        severity: true,
+        message: true,
+        tags: true
+      }
+      tags = {
+        "foo.bar.baz" => "boo",
+        "mip" => {"mop.mip" => "map"}
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
+      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({
+        "severity" => entry.severity_label,
+        "message" => entry.message,
+        "tags" => {
+          "foo" => {"bar" => {"baz" => "boo"}},
+          "mip" => {"mop" => {"mip" => "map"}}
+        }
+      })
+    end
+
+    it "expands nested tags in arrays" do
+      mapping = {
+        severity: true,
+        message: true,
+        tags: true
+      }
+      tags = {
+        "foo" => [{"bar.baz" => "boo"}, {"qux" => ["qux"]}]
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
+      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({
+        "severity" => entry.severity_label,
+        "message" => entry.message,
+        "tags" => {
+          "foo" => [
+            {"bar" => {"baz" => "boo"}},
+            {"qux" => ["qux"]}
+          ]
+        }
       })
     end
   end
@@ -156,7 +261,7 @@ describe Lumberjack::JsonDevice do
       device.flush
       lines = output.string.chomp.split(Lumberjack::LINE_SEPARATOR)
       data = device.entry_as_json(entry)
-      expect(lines).to eq [MultiJson.dump(data)] * 2
+      expect(lines).to eq [JSON.generate(data)] * 2
     end
 
     it "should wrap a stream" do
@@ -166,7 +271,7 @@ describe Lumberjack::JsonDevice do
       device.flush
       lines = output.string.chomp.split(Lumberjack::LINE_SEPARATOR)
       data = device.entry_as_json(entry)
-      expect(lines).to eq [MultiJson.dump(data)] * 2
+      expect(lines).to eq [JSON.generate(data)] * 2
     end
 
     it "should not write out empty log messages" do
@@ -179,6 +284,17 @@ describe Lumberjack::JsonDevice do
       lines = output.string.chomp.split(Lumberjack::LINE_SEPARATOR)
       expect(lines).to eq []
     end
+
+    it "should write one document per line" do
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "line_1\nline_2", "test", 12345, "foo" => {"bar" => "line_1\nline_2"})
+      device = Lumberjack::JsonDevice.new(output)
+      device.write(entry)
+      device.flush
+      lines = output.string.chomp.split("\n")
+      data = device.entry_as_json(entry)
+      expect(lines.length).to eq 1
+      expect(lines.first).to eq JSON.generate(data)
+    end
   end
 
   describe "formatter" do
@@ -189,7 +305,7 @@ describe Lumberjack::JsonDevice do
       device = Lumberjack::JsonDevice.new(output, formatter: formatter, mapping: {time: "time", message: "message", foo: "foo"})
       device.write(entry)
       line = output.string.chomp
-      expect(line).to eq MultiJson.dump("time" => entry.time.iso8601, "message" => "message!", "foo" => "bar!")
+      expect(line).to eq JSON.generate("time" => entry.time.iso8601, "message" => "message!", "foo" => "bar!")
     end
   end
 
@@ -217,7 +333,7 @@ describe Lumberjack::JsonDevice do
       device.write(entry)
       device.flush
       line = output.string.chomp
-      expect(MultiJson.load(line)).to eq({"time" => time_1.strftime(format), "message" => time_2.strftime(format), "app" => "test"})
+      expect(JSON.parse(line)).to eq({"time" => time_1.strftime(format), "message" => time_2.strftime(format), "app" => "test"})
     end
   end
 

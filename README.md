@@ -1,7 +1,6 @@
 # Lumberjack JSON Device
 
 [![Continuous Integration](https://github.com/bdurand/lumberjack_json_device/actions/workflows/continuous_integration.yml/badge.svg)](https://github.com/bdurand/lumberjack_json_device/actions/workflows/continuous_integration.yml)
-[![Regression Test](https://github.com/bdurand/lumberjack_json_device/actions/workflows/regression_test.yml/badge.svg)](https://github.com/bdurand/lumberjack_json_device/actions/workflows/regression_test.yml)
 [![Ruby Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://github.com/testdouble/standard)
 [![Gem Version](https://badge.fury.io/rb/lumberjack_json_device.svg)](https://badge.fury.io/rb/lumberjack_json_device)
 
@@ -25,14 +24,14 @@ device = Lumberjack::JsonDevice.new(log_file)
 By default, the JSON document will map to the `Lumberjack::LogEntry` data structure.
 
 ```json
-{"timestamp": "2020-01-02T19:47:45.123455", "severity": "INFO", "progname": "web", "pid": 101, "message": "test", "tags": {"foo": "bar"}}
+{"time": "2020-01-02T19:47:45.123455-0800", "severity": "INFO", "progname": "web", "pid": 101, "message": "test", "tags": {"foo": "bar"}}
 ```
 
 You can specify a mapping to the device to customize the JSON document data structure. You can map the standard field names (time, severity, progname, pid, message, and tags) to custom field names.
 
 If you map a field to an array, it will be mapped into a nested hash in the JSON document.
 
-Any keys beyond the standard field names will be populated by a tag with the same name. These tags will not be included with the rest of the tags.
+Any keys beyond the standard field names will be populated by extracting tags with the same name. These extracted tags will not be included with the rest of the tags.
 
 ```ruby
 device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
@@ -47,7 +46,7 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
 ```
 
 ```json
-{"timestamp": "2020-01-02T19:47:45.123455", "level": "INFO", "app": {"name": "web", "pid": 101}, "message": "test", "duration": 5, "tags": {"foo": "bar"}}
+{"timestamp": "2020-01-02T19:47:45.123455-0800", "level": "INFO", "app": {"name": "web", "pid": 101}, "message": "test", "duration": 5, "tags": {"foo": "bar"}}
 ```
 
 If you omit any fields in the mapping, they will not appear in the JSON document.
@@ -61,16 +60,16 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
 ```
 
 ```json
-{"timestamp": "2020-01-02T19:47:45.123455", "level": "INFO", "message": "test"}
+{"timestamp": "2020-01-02T19:47:45.123455-0800", "level": "INFO", "message": "test"}
 ```
 
-You can also provide a block or any object that responds to `call` in a mapping. The block will be called with the value and should emit a hash that will be merged into the JSON document.
+You can also provide a block or any object that responds to `call` in a mapping. The block will be called with the value and should return a hash that will be merged into the JSON document.
 
 ```ruby
 device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
-  time: lambda { |val| (timestamp: val.to_f * 1000).round} },
+  time: lambda { |val| {timestamp: (val.to_f * 1000).round} },
   severity: "level",
-  message: "test",
+  message: "message",
 })
 ```
 
@@ -78,7 +77,7 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
 {"timestamp": 1578125375588, "level": "INFO", "message": "test"}
 ```
 
-Finally, you can specify `true` in the mapping as a short cut to map the field to the same name. If the field name contains periods, it will be mapped to a nested structure.
+Finally, you can specify `true` in the mapping as a shortcut to map the field to the same name. If the field name contains periods, it will be mapped to a nested structure.
 
 ```ruby
 device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
@@ -93,14 +92,19 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
 {"message": "test", "http": {"status": 200, "method": "GET", "path": "/resource"}}
 ```
 
-
 ## Data Formatting
 
-The device will have a `Lumberjack::Formatter` that will be used to format objects before serializing them as JSON. You can add additional formatters for classes to the default formatter, or supply a custom one when creating the device.
+The device includes a `Lumberjack::Formatter` that will be used to format objects before serializing them as JSON. You can add additional formatters for specific classes to the default formatter, or supply a custom one when creating the device.
 
 ```ruby
-device.formatter.add(Exception, LumberjacK::Formatter::InspectFormatter.new)
-device.formatter.add(ActiveRecord::Base, LumberjacK::Formatter::IdFormatter.new)
+device.formatter.add(Exception, Lumberjack::Formatter::InspectFormatter.new)
+device.formatter.add(ActiveRecord::Base, Lumberjack::Formatter::IdFormatter.new)
+```
+
+You can also incrementally add the mapping after creating the device using the `map` method:
+
+```ruby
+device.map(duration: "response_time", user_id: ["user", "id"])
 ```
 
 You can also specify the `datetime_format` that will be used to serialize Time and DateTime objects.

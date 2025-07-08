@@ -4,7 +4,7 @@ Gem::Specification.new do |spec|
   spec.authors = ["Brian Durand"]
   spec.email = ["bbdurand@gmail.com"]
 
-  spec.summary = "A logging device for the lumberjack gem that writes log entries as JSON documentspec."
+  spec.summary = "A logging device for the lumberjack gem that writes log entries as JSON documents for use with structured logging."
   spec.homepage = "https://github.com/bdurand/lumberjack_json_device"
   spec.license = "MIT"
 
@@ -26,10 +26,9 @@ Gem::Specification.new do |spec|
 
   spec.require_paths = ["lib"]
 
-  spec.required_ruby_version = ">= 2.4"
+  spec.required_ruby_version = ">= 2.5"
 
   spec.add_dependency "lumberjack", ">=1.2"
-  spec.add_dependency "multi_json"
 
   spec.add_development_dependency("rspec", ["~> 3.0"])
   spec.add_development_dependency "rake"
