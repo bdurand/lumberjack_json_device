@@ -37,13 +37,13 @@ module Lumberjack
     attr_accessor :formatter
     attr_reader :mapping
 
-    def initialize(stream_or_device, mapping: DEFAULT_MAPPING, formatter: nil, datetime_format: nil)
+    def initialize(stream_or_device, mapping: DEFAULT_MAPPING, formatter: nil, datetime_format: nil, pretty: false)
       @mutex = Mutex.new
 
       @device = if stream_or_device.is_a?(Device)
         stream_or_device
       else
-        Writer.new(stream_or_device)
+        Lumberjack::Device::Writer.new(stream_or_device)
       end
 
       self.mapping = mapping
@@ -55,12 +55,15 @@ module Lumberjack
         datetime_format = DEFAULT_TIME_FORMAT if datetime_format.nil?
       end
       add_datetime_formatter!(datetime_format) unless datetime_format.nil?
+
+      @pretty = pretty
     end
 
     def write(entry)
-      return if entry.message.nil? || entry.message == ""
+      return if entry.empty?
+
       data = entry_as_json(entry)
-      json = JSON.generate(data)
+      json = @pretty ? JSON.pretty_generate(data) : JSON.generate(data)
       @device.write(json)
     end
 
@@ -128,11 +131,11 @@ module Lumberjack
     # @return [Hash] A hash representing the log entry in JSON format.
     def entry_as_json(entry)
       data = {}
-      set_attribute(data, @time_key, entry.time) unless @time_key.nil?
-      set_attribute(data, @severity_key, entry.severity_label) unless @severity_key.nil?
-      set_attribute(data, @progname_key, entry.progname) unless @progname_key.nil?
-      set_attribute(data, @pid_key, entry.pid) unless @pid_key.nil?
-      set_attribute(data, @message_key, entry.message) unless @message_key.nil?
+      set_attribute(data, @time_key, entry.time) if @time_key
+      set_attribute(data, @severity_key, entry.severity_label) if @severity_key
+      set_attribute(data, @message_key, entry.message) if @message_key
+      set_attribute(data, @progname_key, entry.progname) if @progname_key
+      set_attribute(data, @pid_key, entry.pid) if @pid_key
 
       tags = dereference_tags(entry.tags) if entry.tags
       extracted_tags = nil
@@ -148,9 +151,13 @@ module Lumberjack
         end
       end
 
-      unless @tags_key.nil?
+      if @tags_key
         tags ||= {}
-        set_attribute(data, @tags_key, tags)
+        if @tags_key == "*"
+          data = tags.merge(data) unless tags.empty?
+        else
+          set_attribute(data, @tags_key, tags)
+        end
       end
 
       data = @formatter.format(data) if @formatter
@@ -199,6 +206,7 @@ module Lumberjack
     end
 
     def tag_value(tags, name)
+      return nil if tags.nil?
       return tags[name] unless name.is_a?(Array)
 
       val = tags[name.first]
@@ -209,6 +217,8 @@ module Lumberjack
     end
 
     def deep_remove_tag(tags, path, original_tags)
+      return nil if tags.nil?
+
       dup_needed = tags.equal?(original_tags)
       key = path.first
       val = tags[key] if path.length > 1

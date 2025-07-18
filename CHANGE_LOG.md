@@ -6,9 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## 2.0.0
 
+### Added
+
+- Field mapping for the JSON can now be set to an array where the first element is the key to map and the second element is a callable object that will transform the value.
+
 ### Changed
 
 - Tag structure is now consistently expanded from dot notation into nested hashes in the `tag` field. Previoulsly this was only done when the template copied tags to the root level of the JSON document.
+- The mapping options now supports setting the value to `false` to exclude a field from the JSON output.
+- Tag mapping can now be set to `"*"` to copy all tags into the root of the JSON document.
 
 ### Removed
 

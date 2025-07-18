@@ -63,7 +63,7 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
 {"timestamp": "2020-01-02T19:47:45.123455-0800", "level": "INFO", "message": "test"}
 ```
 
-You can also provide a block or any object that responds to `call` in a mapping. The block will be called with the value and should return a hash that will be merged into the JSON document.
+You can also provide a block or any object that responds to `call` in a mapping. The block will be called with the value and the result will be merged back in to the JSON document.
 
 ```ruby
 device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
@@ -74,22 +74,49 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
 ```
 
 ```json
-{"timestamp": 1578125375588, "level": "INFO", "message": "test"}
+{"timestamp": 1578125375588, "level": "info", "message": "test"}
 ```
 
-Finally, you can specify `true` in the mapping as a shortcut to map the field to the same name. If the field name contains periods, it will be mapped to a nested structure.
+You can specify `true` in the mapping as a shortcut to map the field to the same name. The value false can be used to indicate it should be excluded from the JSON output.
+
+```ruby
+device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
+  time: "timestamp",
+  severity: true,
+  progname: true,
+  pid: false,
+  message: "message",
+  tags: true
+})
+```
+
+You can supply additional field mapping that will be applied to move log tags within the JSON document. If the field name contains periods, it will be mapped to a nested structure.
 
 ```ruby
 device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
   "message" => true,
   "http.status" => true,
   "http.method" => true,
-  "http.path" => true
+  "http.path" => true,
+  "tags" => true
 })
 ```
 
 ```json
 {"message": "test", "http": {"status": 200, "method": "GET", "path": "/resource"}}
+```
+
+You can also use the `*` key to copy all tags into the root of the JSON document.
+
+```ruby
+device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
+  "message" => true,
+  "tags" => "*"
+})
+```
+
+```json
+{"message": "test", "tag1": "value", "tag2": "value"}
 ```
 
 ## Data Formatting

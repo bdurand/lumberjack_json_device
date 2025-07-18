@@ -2,6 +2,8 @@ source "https://rubygems.org"
 
 gemspec
 
+gem "lumberjack", path: "../lumberjack"
+
 gem "dotenv"
 gem "rspec", "~> 3.10"
 gem "appraisal"

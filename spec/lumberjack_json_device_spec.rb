@@ -1,6 +1,6 @@
 require "spec_helper"
 
-describe Lumberjack::JsonDevice do
+RSpec.describe Lumberjack::JsonDevice do
   let(:output) { StringIO.new }
   let(:entry) { Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar", "baz" => "boo") }
 
@@ -114,7 +114,7 @@ describe Lumberjack::JsonDevice do
       })
     end
 
-    it "should be able to map with a proc" do
+    it "should be able to transform a value with a proc" do
       mapping = {
         time: lambda { |t| {timestamp: t.to_i} },
         severity: "level",
@@ -154,6 +154,36 @@ describe Lumberjack::JsonDevice do
       })
     end
 
+    it "should not include values if the mapping is set to nil" do
+      mapping = {
+        severity: true,
+        message: true,
+        progname: nil
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar")
+      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({
+        "severity" => entry.severity_label,
+        "message" => entry.message
+      })
+    end
+
+    it "should not include values if the mapping is set to false" do
+      mapping = {
+        severity: true,
+        message: true,
+        progname: false
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar")
+      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({
+        "severity" => entry.severity_label,
+        "message" => entry.message
+      })
+    end
+
     it "should nest tags in the JSON document using dot syntax" do
       mapping = {
         severity: true,
@@ -176,6 +206,28 @@ describe Lumberjack::JsonDevice do
           "foo" => {"bar" => "boo"},
           "mip" => "map"
         }
+      })
+    end
+
+    it "moves tags to the root level if the tags key is set to '*'" do
+      mapping = {
+        severity: true,
+        message: true,
+        tags: "*"
+      }
+      tags = {
+        "severity" => "bap",
+        "foo.bar" => "boo",
+        "mip" => "map"
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
+      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({
+        "severity" => entry.severity_label,
+        "message" => entry.message,
+        "foo" => {"bar" => "boo"},
+        "mip" => "map"
       })
     end
 
@@ -275,8 +327,8 @@ describe Lumberjack::JsonDevice do
     end
 
     it "should not write out empty log messages" do
-      blank_entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "", "test", 12345, "foo.bar" => "boo")
-      nil_entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, nil, "test", 12345, "foo.bar" => "boo")
+      blank_entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "", "test", 12345, {})
+      nil_entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, nil, "test", 12345, nil)
       device = Lumberjack::JsonDevice.new(output)
       device.write(blank_entry)
       device.write(nil_entry)
@@ -294,6 +346,16 @@ describe Lumberjack::JsonDevice do
       data = device.entry_as_json(entry)
       expect(lines.length).to eq 1
       expect(lines.first).to eq JSON.generate(data)
+    end
+
+    it "should allow writing out pretty JSON" do
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "pretty", "test", 12345, "foo" => {"bar" => "baz"})
+      device = Lumberjack::JsonDevice.new(output, pretty: true)
+      device.write(entry)
+      device.flush
+      lines = output.string.chomp
+      data = device.entry_as_json(entry)
+      expect(lines).to eq JSON.pretty_generate(data)
     end
   end
 
