@@ -357,6 +357,16 @@ RSpec.describe Lumberjack::JsonDevice do
       data = device.entry_as_json(entry)
       expect(lines).to eq JSON.pretty_generate(data)
     end
+
+    it "should write out dot notation tags from log messages as nested JSON" do
+      device = Lumberjack::JsonDevice.new(output)
+      logger = Lumberjack::Logger.new(device)
+      logger.info("message", "foo.bar" => "baz", "foo.baz" => "boo")
+      logger.flush
+      json = JSON.parse(output.string.chomp.split(Lumberjack::LINE_SEPARATOR).last)
+      expect(json.dig("tags", "foo", "bar")).to eq "baz"
+      expect(json.dig("tags", "foo", "baz")).to eq "boo"
+    end
   end
 
   describe "formatter" do
