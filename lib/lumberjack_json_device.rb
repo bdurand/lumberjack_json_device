@@ -35,9 +35,26 @@ module Lumberjack
     DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%6N%z"
 
     attr_accessor :formatter
+    attr_accessor :post_processor
+    attr_writer :pretty
     attr_reader :mapping
 
-    def initialize(stream_or_device, mapping: DEFAULT_MAPPING, formatter: nil, datetime_format: nil, pretty: false)
+    # @param stream_or_device [IO, Lumberjack::Device] The output stream or Lumberjack device to write
+    #  the JSON formatted log entries to.
+    # @param mapping [Hash] A hash where the key is the log entry field name and the value indicates how
+    #   to map the field if it exists. If the value is `true`, the field will be mapped to the same name.
+    #   If the value is an array, it will be mapped to a nested structure that follows the array elements.
+    #   If the value is a callable object, it will be called with the value and is expected to return
+    #   a hash that will be merged into the JSON document.
+    #   If the value is `false`, the field will not be included in the JSON output.
+    # @param formatter [Lumberjack::Formatter] An optional formatter to use for formatting the log entry data.
+    # @param datetime_format [String] An optional datetime format string to use for formatting the log timestamp.
+    # @param post_processor [Proc] An optional callable object that will be called with the log entry hash
+    #   before it is written to the output stream. This can be used to modify the log entry data
+    #   before it is serialized to JSON.
+    # @param pretty [Boolean] If true, the output will be formatted as pretty JSON with indentation and newlines.
+    #   The default is false, which writes each log entry as a single line JSON document.
+    def initialize(stream_or_device, mapping: DEFAULT_MAPPING, formatter: nil, datetime_format: nil, post_processor: nil, pretty: false)
       @mutex = Mutex.new
 
       @device = if stream_or_device.is_a?(Device)
@@ -56,7 +73,9 @@ module Lumberjack
       end
       add_datetime_formatter!(datetime_format) unless datetime_format.nil?
 
-      @pretty = pretty
+      @post_processor = post_processor
+
+      @pretty = !!pretty
     end
 
     def write(entry)
@@ -78,6 +97,14 @@ module Lumberjack
     # @param format [String] The datetime format string to use for formatting the log timestamp.
     def datetime_format=(format)
       add_datetime_formatter!(format)
+    end
+
+    # Return true if the output is written in a multi-line pretty format. The default is to write each
+    # log entry as a single line JSON document.
+    #
+    # @return [Boolean]
+    def pretty?
+      !!@pretty
     end
 
     # Set the mapping for how to map an entry to a JSON object.
@@ -161,6 +188,11 @@ module Lumberjack
       end
 
       data = @formatter.format(data) if @formatter
+      if @post_processor
+        processed_result = @post_processor.call(data)
+        data = processed_result if processed_result.is_a?(Hash)
+      end
+
       data
     end
 

@@ -434,4 +434,26 @@ RSpec.describe Lumberjack::JsonDevice do
       expect(data).to eq({"level" => "INFO"})
     end
   end
+
+  describe "post_processor" do
+    it "can provide a post processor to modify the log entry before writing" do
+      post_processor = ->(data) { data.transform_keys(&:upcase) }
+      device = Lumberjack::JsonDevice.new(output, post_processor: post_processor)
+      device.write(entry)
+      device.flush
+      json = JSON.parse(output.string.chomp)
+      expect(json["MESSAGE"]).to eq entry.message
+      expect(json.keys).to match_array(json.keys.collect(&:upcase))
+    end
+
+    it "ignores the post processor result if it is not a hash" do
+      post_processor = ->(data) { data.delete("message") }
+      device = Lumberjack::JsonDevice.new(output, post_processor: post_processor)
+      device.write(entry)
+      device.flush
+      json = JSON.parse(output.string.chomp)
+      expect(json).to include("time")
+      expect(json).not_to include("message")
+    end
+  end
 end

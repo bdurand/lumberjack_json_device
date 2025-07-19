@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Field mapping for the JSON can now be set to an array where the first element is the key to map and the second element is a callable object that will transform the value.
 - Output can be set to pretty for better display in development environments.
+- Added post_processor option to allow custom processing of the log entry hash before it is written to the output stream.
 
 ### Changed
 
