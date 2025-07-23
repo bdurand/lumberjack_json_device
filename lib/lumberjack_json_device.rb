@@ -164,7 +164,7 @@ module Lumberjack
       set_attribute(data, @progname_key, entry.progname) if @progname_key
       set_attribute(data, @pid_key, entry.pid) if @pid_key
 
-      tags = dereference_tags(entry.tags) if entry.tags
+      tags = Lumberjack::Utils.expand_tags(entry.tags) if entry.tags
       extracted_tags = nil
       if @custom_keys.size > 0 && !tags&.empty?
         extracted_tags = []
@@ -197,45 +197,6 @@ module Lumberjack
     end
 
     private
-
-    def dereference_tags(tags)
-      updated_tags = nil
-      remove_tags = nil
-
-      tags.each do |original_key, value|
-        updated_tags ||= tags.dup unless original_key.is_a?(String)
-        key = original_key.to_s
-
-        dot_index = key.index(".")
-        if dot_index
-          remove_tags ||= []
-          remove_tags << original_key
-          updated_tags ||= tags.dup
-          sub_key = key[dot_index + 1..-1]
-          key = key[0, dot_index]
-          existing_vals = updated_tags[key]
-          unless existing_vals.is_a?(Hash)
-            existing_vals = {}
-            updated_tags[key] = existing_vals
-          end
-          existing_vals.merge!(dereference_tags({sub_key => value}))
-        elsif value.is_a?(Enumerable)
-          updated_tags ||= tags.dup
-          updated_tags[key] = if value.is_a?(Hash)
-            dereference_tags(value)
-          else
-            value.collect { |v| v.is_a?(Hash) ? dereference_tags(v) : v }
-          end
-        elsif updated_tags
-          updated_tags[key] = value
-        end
-      end
-
-      return tags unless updated_tags
-
-      remove_tags&.each { |key| updated_tags.delete(key) }
-      updated_tags
-    end
 
     def tag_value(tags, name)
       return nil if tags.nil?
