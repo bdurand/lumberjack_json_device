@@ -302,6 +302,52 @@ RSpec.describe Lumberjack::JsonDevice do
         }
       })
     end
+
+    it "can handle mixed dot notation and structured tags with dot notation tags first" do
+      mapping = {
+        severity: true,
+        message: true,
+        tags: true
+      }
+      tags = {
+        "foo.bar" => "baz",
+        "foo" => {"bip" => "bop"},
+        "foo.quz" => {"wap.woop" => "wop"}
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
+      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      expanded_tags = device.entry_as_json(entry)["tags"]
+      expect(expanded_tags).to eq({
+        "foo" => {
+          "bar" => "baz",
+          "bip" => "bop",
+          "quz" => {"wap" => {"woop" => "wop"}}
+        }
+      })
+    end
+
+    it "can handle mixed dot notation and structured tags with structured tags first" do
+      mapping = {
+        severity: true,
+        message: true,
+        tags: true
+      }
+      tags = {
+        "foo" => {"bar" => "baz"},
+        "foo.bip" => "bop",
+        "foo.quz" => {"wap.woop" => "wop"}
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
+      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      expanded_tags = device.entry_as_json(entry)["tags"]
+      expect(expanded_tags).to eq({
+        "foo" => {
+          "bar" => "baz",
+          "bip" => "bop",
+          "quz" => {"wap" => {"woop" => "wop"}}
+        }
+      })
+    end
   end
 
   describe "device wrapping" do
