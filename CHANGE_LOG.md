@@ -4,11 +4,26 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## 2.2.0
+## 3.0.0
 
 ### Added
 
 - Support for Lumberjack 2.0.
+
+### Changed
+
+- **Breaking Change** Tags are now called attributes and are put in the `"attributes"` JSON field by default. If you want to keep the old behavior, you will need to set the mapping to:
+
+```ruby
+  {
+    time: true,
+    severity: true,
+    progname: true,
+    pid: true,
+    message: true,
+    attributes: ["tags"]
+  }
+```
 
 ### Removed
 

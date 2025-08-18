@@ -1,3 +1,5 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 
 RSpec.describe Lumberjack::JsonDevice do
@@ -15,6 +17,27 @@ RSpec.describe Lumberjack::JsonDevice do
         "pid" => entry.pid,
         "message" => entry.message,
         "attributes" => entry.attributes
+      })
+    end
+
+    it "can map attributes to tags for compatibility with release < 3.0" do
+      mapping = {
+        time: true,
+        severity: true,
+        progname: true,
+        pid: true,
+        message: true,
+        attributes: ["tags"]
+      }
+      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({
+        "time" => entry.time.strftime("%Y-%m-%dT%H:%M:%S.%6N%z"),
+        "severity" => entry.severity_label,
+        "progname" => entry.progname,
+        "pid" => entry.pid,
+        "message" => entry.message,
+        "tags" => entry.attributes
       })
     end
 
