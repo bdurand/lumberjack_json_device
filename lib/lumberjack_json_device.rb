@@ -165,29 +165,26 @@ module Lumberjack
       set_attribute(data, @progname_key, json_safe(entry.progname)) if @progname_key && entry.progname
       set_attribute(data, @pid_key, entry.pid) if @pid_key
 
-      tags = nil
-      if entry.tags
-        json_safe_tags = entry.tags.transform_values { |value| json_safe(value) }
-        tags = Lumberjack::Utils.expand_tags(json_safe_tags)
-      end
+      tags = entry.tags.transform_values { |value| json_safe(value) } if entry.tags
 
       extracted_tags = nil
       if @custom_keys.size > 0 && !tags&.empty?
         extracted_tags = []
         @custom_keys.each do |name, key|
-          set_attribute(data, key, tag_value(tags, name))
-          extracted_tags << name
-        end
+          name = name.is_a?(Array) ? name.join(".") : name.to_s
+          value = tags.delete(name)
+          next if value.nil?
 
-        extracted_tags.each do |path|
-          tags = deep_remove_tag(tags, path, entry.tags)
+          value = Lumberjack::Utils.expand_tags(value) if value.is_a?(Hash)
+          set_attribute(data, key, value)
+          extracted_tags << name
         end
       end
 
-      if @tags_key
-        tags ||= {}
+      if @tags_key && !tags&.empty?
+        tags = Lumberjack::Utils.expand_tags(tags)
         if @tags_key == "*"
-          data = tags.merge(data) unless tags.empty?
+          tags.each { |k, v| data[k] = v unless data.include?(k) }
         else
           set_attribute(data, @tags_key, tags)
         end
@@ -204,50 +201,14 @@ module Lumberjack
 
     private
 
-    def tag_value(tags, name)
-      return nil if tags.nil?
-      return tags[name] unless name.is_a?(Array)
-
-      val = tags[name.first]
-      return val if name.length == 1
-      return nil unless val.is_a?(Hash)
-
-      tag_value(val, name[1, name.length])
-    end
-
-    def deep_remove_tag(tags, path, original_tags)
-      return nil if tags.nil?
-
-      dup_needed = tags.equal?(original_tags)
-      key = path.first
-      val = tags[key] if path.length > 1
-      unless val.is_a?(Hash)
-        if tags.include?(key)
-          tags = tags.dup if dup_needed
-          tags.delete(key)
-        end
-        return tags
-      end
-
-      new_val = deep_remove_tag(val, path[1, path.length], original_tags[key])
-      if new_val.empty? || !new_val.equal?(val)
-        tags = tags.dup if dup_needed
-        if new_val.empty?
-          tags.delete(key)
-        else
-          tags[key] = new_val
-        end
-      end
-
-      tags
-    end
-
     def set_attribute(data, key, value)
       return if value.nil?
 
       if (value.is_a?(Time) || value.is_a?(DateTime)) && @time_formatter
         value = @time_formatter.call(value)
       end
+
+      key = key.split(".") if key.is_a?(String) && key.include?(".")
 
       if key.is_a?(Array)
         unless key.empty?
@@ -264,7 +225,7 @@ module Lumberjack
           deep_merge!(data, Lumberjack::Tags.stringify_keys(hash))
         end
       else
-        data[key] = value unless key.nil?
+        data[key.to_s] = value unless key.nil?
       end
     end
 

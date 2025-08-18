@@ -124,7 +124,7 @@ RSpec.describe Lumberjack::JsonDevice do
         time: "timestamp",
         severity: "level",
         progname: ["process", "name"],
-        pid: ["process", "pid"],
+        pid: "process.pid",
         message: ["payload", "message"],
         tags: ["payload", "tags"]
       }
@@ -161,10 +161,10 @@ RSpec.describe Lumberjack::JsonDevice do
         "foo.bar": true,
         tags: true
       }
-      tags = {
+      tags = Lumberjack::Utils.flatten_tags({
         "foo" => {"bar" => "boo"},
         "baz" => "bip"
-      }
+      })
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
       device = Lumberjack::JsonDevice.new(output, mapping: mapping)
       data = device.entry_as_json(entry)
