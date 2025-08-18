@@ -16,9 +16,9 @@ module Lumberjack
   # * :progname
   # * :pid
   # * :message
-  # * :tags
+  # * :attributes
   #
-  # Any additional keys will be pulled from the tags. If any of the standard keys are missing or have a nil
+  # Any additional keys will be pulled from the attributes. If any of the standard keys are missing or have a nil
   # mapping, the entry field will not be included in the JSON output.
   #
   # You can create a nested JSON structure by specifying an array as the JSON key.
@@ -29,7 +29,7 @@ module Lumberjack
       progname: true,
       pid: true,
       message: true,
-      tags: true
+      attributes: true
     }.freeze
 
     DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%6N%z"
@@ -131,7 +131,7 @@ module Lumberjack
         @progname_key = keys.delete(:progname)
         @pid_key = keys.delete(:pid)
         @message_key = keys.delete(:message)
-        @tags_key = keys.delete(:tags)
+        @attributes_key = keys.delete(:attributes)
         @custom_keys = keys.map do |name, key|
           [name.to_s.split("."), key]
         end.to_h
@@ -164,26 +164,26 @@ module Lumberjack
       set_attribute(data, @progname_key, entry.progname) if @progname_key
       set_attribute(data, @pid_key, entry.pid) if @pid_key
 
-      tags = Lumberjack::Utils.expand_tags(entry.tags) if entry.tags
-      extracted_tags = nil
-      if @custom_keys.size > 0 && !tags&.empty?
-        extracted_tags = []
+      attributes = Lumberjack::Utils.expand_attributes(entry.attributes) if entry.attributes
+      extracted_attributes = nil
+      if @custom_keys.size > 0 && !attributes&.empty?
+        extracted_attributes = []
         @custom_keys.each do |name, key|
-          set_attribute(data, key, tag_value(tags, name))
-          extracted_tags << name
+          set_attribute(data, key, attribute_value(attributes, name))
+          extracted_attributes << name
         end
 
-        extracted_tags.each do |path|
-          tags = deep_remove_tag(tags, path, entry.tags)
+        extracted_attributes.each do |path|
+          attributes = deep_remove_attribute(attributes, path, entry.attributes)
         end
       end
 
-      if @tags_key
-        tags ||= {}
-        if @tags_key == "*"
-          data = tags.merge(data) unless tags.empty?
+      if @attributes_key
+        attributes ||= {}
+        if @attributes_key == "*"
+          data = attributes.merge(data) unless attributes.empty?
         else
-          set_attribute(data, @tags_key, tags)
+          set_attribute(data, @attributes_key, attributes)
         end
       end
 
@@ -198,42 +198,42 @@ module Lumberjack
 
     private
 
-    def tag_value(tags, name)
-      return nil if tags.nil?
-      return tags[name] unless name.is_a?(Array)
+    def attribute_value(attributes, name)
+      return nil if attributes.nil?
+      return attributes[name] unless name.is_a?(Array)
 
-      val = tags[name.first]
+      val = attributes[name.first]
       return val if name.length == 1
       return nil unless val.is_a?(Hash)
 
-      tag_value(val, name[1, name.length])
+      attribute_value(val, name[1, name.length])
     end
 
-    def deep_remove_tag(tags, path, original_tags)
-      return nil if tags.nil?
+    def deep_remove_attribute(attributes, path, original_attributes)
+      return nil if attributes.nil?
 
-      dup_needed = tags.equal?(original_tags)
+      dup_needed = attributes.equal?(original_attributes)
       key = path.first
-      val = tags[key] if path.length > 1
+      val = attributes[key] if path.length > 1
       unless val.is_a?(Hash)
-        if tags.include?(key)
-          tags = tags.dup if dup_needed
-          tags.delete(key)
+        if attributes.include?(key)
+          attributes = attributes.dup if dup_needed
+          attributes.delete(key)
         end
-        return tags
+        return attributes
       end
 
-      new_val = deep_remove_tag(val, path[1, path.length], original_tags[key])
+      new_val = deep_remove_attribute(val, path[1, path.length], original_attributes[key])
       if new_val.empty? || !new_val.equal?(val)
-        tags = tags.dup if dup_needed
+        attributes = attributes.dup if dup_needed
         if new_val.empty?
-          tags.delete(key)
+          attributes.delete(key)
         else
-          tags[key] = new_val
+          attributes[key] = new_val
         end
       end
 
-      tags
+      attributes
     end
 
     def set_attribute(data, key, value)
@@ -255,7 +255,7 @@ module Lumberjack
       elsif key.respond_to?(:call)
         hash = key.call(value)
         if hash.is_a?(Hash)
-          deep_merge!(data, Lumberjack::Tags.stringify_keys(hash))
+          deep_merge!(data, hash)
         end
       else
         data[key] = value unless key.nil?

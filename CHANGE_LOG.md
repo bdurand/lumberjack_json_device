@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 2.2.0
+
+### Added
+
+- Support for Lumberjack 2.0.
+
+### Removed
+
+- Support for Ruby versions less than 2.7
+
 ## 2.1.0
 
 ### Changed
@@ -20,9 +30,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Tag structure is now consistently expanded from dot notation into nested hashes in the `tag` field. Previoulsly this was only done when the template copied tags to the root level of the JSON document.
+- Tag structure is now consistently expanded from dot notation into nested hashes in the `attribute` field. Previoulsly this was only done when the template copied attributes to the root level of the JSON document.
 - The mapping options now supports setting the value to `false` to exclude a field from the JSON output.
-- Tag mapping can now be set to `"*"` to copy all tags into the root of the JSON document.
+- Tag mapping can now be set to `"*"` to copy all attributes into the root of the JSON document.
 
 ### Removed
 

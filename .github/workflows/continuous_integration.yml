@@ -5,7 +5,7 @@ on:
     branches:
       - main
       - actions-*
-    tags:
+    attributes:
       - v*
   pull_request:
     branches-ignore:

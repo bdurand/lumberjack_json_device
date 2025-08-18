@@ -14,9 +14,9 @@ require 'lumberjack_json_device'
 # Create a logger with JSON output to STDOUT
 logger = Lumberjack::Logger.new(Lumberjack::JsonDevice.new(STDOUT))
 
-# Log a message with tags
+# Log a message with attributes
 logger.info("User logged in", user_id: 123, session_id: "abc")
-# Output: {"time":"2020-01-02T19:47:45.123455-0800","severity":"INFO","progname":null,"pid":12345,"message":"User logged in","tags":{"user_id":123,"session_id":"abc"}}
+# Output: {"time":"2020-01-02T19:47:45.123455-0800","severity":"INFO","progname":null,"pid":12345,"message":"User logged in","attributes":{"user_id":123,"session_id":"abc"}}
 ```
 
 ## Output Destinations
@@ -37,7 +37,7 @@ device = Lumberjack::JsonDevice.new(log_file)
 By default, the JSON document maps to the `Lumberjack::LogEntry` data structure and includes all standard fields:
 
 ```json
-{"time": "2020-01-02T19:47:45.123455-0800", "severity": "INFO", "progname": "web", "pid": 101, "message": "test", "tags": {"foo": "bar"}}
+{"time": "2020-01-02T19:47:45.123455-0800", "severity": "INFO", "progname": "web", "pid": 101, "message": "test", "attributes": {"foo": "bar"}}
 ```
 
 ### Custom Field Mapping
@@ -50,7 +50,7 @@ You can customize the JSON document structure by providing a mapping that specif
 - **`false`**: Excludes the field from the JSON output
 - **Callable**: Transforms the value using custom logic
 
-You can map the standard field names (`time`, `severity`, `progname`, `pid`, `message`, and `tags`) as well as extract specific tags by name.
+You can map the standard field names (`time`, `severity`, `progname`, `pid`, `message`, and `attributes`) as well as extract specific attributes by name.
 
 ```ruby
 device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
@@ -59,13 +59,13 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
   progname: ["app", "name"],
   pid: ["app", "pid"],
   message: "message",
-  duration: "duration",  # Extracts the "duration" tag
-  tags: "tags"
+  duration: "duration",  # Extracts the "duration" attribute
+  attributes: "attributes"
 })
 ```
 
 ```json
-{"timestamp": "2020-01-02T19:47:45.123455-0800", "level": "INFO", "app": {"name": "web", "pid": 101}, "message": "test", "duration": 5, "tags": {"foo": "bar"}}
+{"timestamp": "2020-01-02T19:47:45.123455-0800", "level": "INFO", "app": {"name": "web", "pid": 101}, "message": "test", "duration": 5, "attributes": {"foo": "bar"}}
 ```
 
 ### Excluding Fields
@@ -112,43 +112,43 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
   progname: true,      # Maps to "progname"
   pid: false,          # Excluded from output
   message: "message",
-  tags: true          # Maps to "tags"
+  attributes: true          # Maps to "attributes"
 })
 ```
 
 ### Tag Extraction and Dot Notation
 
-You can extract specific tags from the log entry and map them to custom locations in the JSON. Tags with dot notation in their names are automatically expanded into nested structures:
+You can extract specific attributes from the log entry and map them to custom locations in the JSON. Tags with dot notation in their names are automatically expanded into nested structures:
 
 ```ruby
 device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
   "message" => true,
-  "http.status" => true,    # Extracts "http.status" tag
-  "http.method" => true,    # Extracts "http.method" tag
-  "http.path" => true,      # Extracts "http.path" tag
-  "tags" => true
+  "http.status" => true,    # Extracts "http.status" attribute
+  "http.method" => true,    # Extracts "http.method" attribute
+  "http.path" => true,      # Extracts "http.path" attribute
+  "attributes" => true
 })
 ```
 
 ```json
-{"message": "test", "http": {"status": 200, "method": "GET", "path": "/resource"}, "tags": {"other": "values"}}
+{"message": "test", "http": {"status": 200, "method": "GET", "path": "/resource"}, "attributes": {"other": "values"}}
 ```
 
-**Important**: All tags are automatically expanded from dot notation into nested hash structures, not just extracted tags. For example, if you have a tag named `"user.profile.name"`, it will automatically become `{"user": {"profile": {"name": "value"}}}` in the tags section.
+**Important**: All attributes are automatically expanded from dot notation into nested hash structures, not just extracted attributes. For example, if you have an attribute named `"user.profile.name"`, it will automatically become `{"user": {"profile": {"name": "value"}}}` in the attributes section.
 
 ### Flattening Tags to Root Level
 
-Use `"*"` as the tags mapping value to copy all remaining tags directly to the root level of the JSON document:
+Use `"*"` as the attributes mapping value to copy all remaining attributes directly to the root level of the JSON document:
 
 ```ruby
 device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
   "message" => true,
-  "tags" => "*"
+  "attributes" => "*"
 })
 ```
 
 ```json
-{"message": "test", "tag1": "value", "tag2": "value"}
+{"message": "test", "attribute1": "value", "attribute2": "value"}
 ```
 
 ## Data Formatting
@@ -219,7 +219,7 @@ The `JsonDevice` constructor accepts the following options:
 ```ruby
 device = Lumberjack::JsonDevice.new(
   STDOUT,
-  mapping: { time: "timestamp", message: true, tags: "*" },
+  mapping: { time: "timestamp", message: true, attributes: "*" },
   datetime_format: "%Y-%m-%d %H:%M:%S",
   pretty: true,
   post_processor: lambda { |data| data.merge(app: "myapp") }

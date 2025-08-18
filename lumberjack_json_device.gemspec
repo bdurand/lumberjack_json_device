@@ -26,7 +26,7 @@ Gem::Specification.new do |spec|
 
   spec.require_paths = ["lib"]
 
-  spec.required_ruby_version = ">= 2.5"
+  spec.required_ruby_version = ">= 2.7"
 
-  spec.add_dependency "lumberjack", ">=1.3.3"
+  spec.add_dependency "lumberjack", ">=2.0"
 end
