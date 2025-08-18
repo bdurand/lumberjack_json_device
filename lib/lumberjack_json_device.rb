@@ -168,7 +168,7 @@ module Lumberjack
       tags = entry.tags.transform_values { |value| json_safe(value) } if entry.tags
 
       extracted_tags = nil
-      if @custom_keys.size > 0 && tags && !tags&.empty?
+      if @custom_keys.size > 0 && !tags&.empty?
         extracted_tags = []
         @custom_keys.each do |name, key|
           name = name.is_a?(Array) ? name.join(".") : name.to_s
@@ -181,10 +181,10 @@ module Lumberjack
         end
       end
 
-      if @tags_key && tags && !tags&.empty?
+      if @tags_key && !tags&.empty?
         tags = Lumberjack::Utils.expand_tags(tags)
         if @tags_key == "*"
-          tags.each { |k, v| data[k] ||= v }
+          tags.each { |k, v| data[k] = v if data[k].nil? }
         else
           set_attribute(data, @tags_key, tags)
         end
