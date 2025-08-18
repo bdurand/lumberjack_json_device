@@ -147,7 +147,7 @@ RSpec.describe Lumberjack::JsonDevice do
         time: "timestamp",
         severity: "level",
         progname: ["process", "name"],
-        pid: ["process", "pid"],
+        pid: "process.pid",
         message: ["payload", "message"],
         attributes: ["payload", "attributes"]
       }
@@ -184,10 +184,10 @@ RSpec.describe Lumberjack::JsonDevice do
         "foo.bar": true,
         attributes: true
       }
-      attributes = {
+      attributes = Lumberjack::Utils.flatten_tags({
         "foo" => {"bar" => "boo"},
         "baz" => "bip"
-      }
+      })
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, attributes)
       device = Lumberjack::JsonDevice.new(output, mapping: mapping)
       data = device.entry_as_json(entry)
@@ -501,6 +501,48 @@ RSpec.describe Lumberjack::JsonDevice do
       device.mapping = device.map(message: false, severity: "level")
       data = device.entry_as_json(entry)
       expect(data).to eq({"level" => "INFO"})
+    end
+  end
+
+  describe "as_json support" do
+    let(:obj) do
+      Object.new.tap do |o|
+        def o.as_json(options = nil)
+          {"foo" => "bar"}
+        end
+      end
+    end
+
+    it "calls as_json on the message" do
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, obj, nil, 12345, {})
+      device = Lumberjack::JsonDevice.new(output, mapping: {message: "message"})
+      device.write(entry)
+      line = output.string.chomp
+      expect(JSON.parse(line)["message"]).to eq({"foo" => "bar"})
+    end
+
+    it "calls as_json on the progname" do
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", obj, 12345, {})
+      device = Lumberjack::JsonDevice.new(output, mapping: {progname: "progname"})
+      device.write(entry)
+      line = output.string.chomp
+      expect(JSON.parse(line)["progname"]).to eq({"foo" => "bar"})
+    end
+
+    it "calls as_json on the attributes" do
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", "app", 12345, {"a" => obj})
+      device = Lumberjack::JsonDevice.new(output)
+      device.write(entry)
+      line = output.string.chomp
+      expect(JSON.parse(line)["tags"]).to eq({"a" => {"foo" => "bar"}})
+    end
+
+    it "calls as_json on nested values" do
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", "app", 12345, {"a" => ["d", {"b" => obj}]})
+      device = Lumberjack::JsonDevice.new(output)
+      device.write(entry)
+      line = output.string.chomp
+      expect(JSON.parse(line)["tags"]).to eq({"a" => ["d", {"b" => {"foo" => "bar"}}]})
     end
   end
 
