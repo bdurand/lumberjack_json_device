@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - The `as_json` method for custom JSON serialization is now supported. This gives more consistent results when serializing non-primitive objects types. Some JSON parsing libraries and Rails will use this method, but the core `JSON` library does not which can result in unexpected behavior.
+- Keep the order of keys in the payload so that the first keys are always time, severity, message, etc.
 
 ## 2.1.0
 

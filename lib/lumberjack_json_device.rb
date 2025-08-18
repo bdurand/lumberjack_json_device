@@ -184,10 +184,9 @@ module Lumberjack
         end
       end
 
-      if @tags_key
-        tags ||= {}
+      if @tags_key && tags && !tags&.empty?
         if @tags_key == "*"
-          data = tags.merge(data) unless tags.empty?
+          tags.each { |k, v| data[k] ||= v }
         else
           set_attribute(data, @tags_key, tags)
         end
