@@ -184,7 +184,7 @@ module Lumberjack
       if @tags_key && !tags&.empty?
         tags = Lumberjack::Utils.expand_tags(tags)
         if @tags_key == "*"
-          tags.each { |k, v| data[k] = v if data[k].nil? }
+          tags.each { |k, v| data[k] = v unless data.include?(k) }
         else
           set_attribute(data, @tags_key, tags)
         end
