@@ -305,11 +305,13 @@ module Lumberjack
     def json_safe(value)
       return nil if value.nil?
 
-      as_json_arity = value.method(:as_json).arity if  value.respond_to?(:as_json)
+      # Check if the as_json method is defined takes no parameters
+      as_json_arity = value.method(:as_json).arity if value.respond_to?(:as_json)
+
       if as_json_arity == 0 || as_json_arity == -1
         value.as_json
       elsif value.is_a?(Hash)
-        value.transform_values! { |v| json_safe(v) }
+        value.transform_values { |v| json_safe(v) }
       elsif value.is_a?(Enumerable)
         value.collect { |v| json_safe(v) }
       else
