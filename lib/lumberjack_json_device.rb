@@ -2,6 +2,7 @@
 
 require "lumberjack"
 require "json"
+require "time"
 
 module Lumberjack
   # This Lumberjack device logs output to another device as JSON formatted text with one document per line.
@@ -160,11 +161,16 @@ module Lumberjack
       data = {}
       set_attribute(data, @time_key, entry.time) if @time_key
       set_attribute(data, @severity_key, entry.severity_label) if @severity_key
-      set_attribute(data, @message_key, entry.message) if @message_key
-      set_attribute(data, @progname_key, entry.progname) if @progname_key
+      set_attribute(data, @message_key, json_safe(entry.message)) if @message_key
+      set_attribute(data, @progname_key, json_safe(entry.progname)) if @progname_key && entry.progname
       set_attribute(data, @pid_key, entry.pid) if @pid_key
 
-      tags = Lumberjack::Utils.expand_tags(entry.tags) if entry.tags
+      tags = nil
+      if entry.tags
+        json_safe_tags = entry.tags.transform_values { |value| json_safe(value) }
+        tags = Lumberjack::Utils.expand_tags(json_safe_tags)
+      end
+
       extracted_tags = nil
       if @custom_keys.size > 0 && !tags&.empty?
         extracted_tags = []
@@ -293,6 +299,23 @@ module Lumberjack
         else
           other_val
         end
+      end
+    end
+
+    def json_safe(value)
+      return nil if value.nil?
+
+      # Check if the as_json method is defined takes no parameters
+      as_json_arity = value.method(:as_json).arity if value.respond_to?(:as_json)
+
+      if as_json_arity == 0 || as_json_arity == -1
+        value.as_json
+      elsif value.is_a?(Hash)
+        value.transform_values { |v| json_safe(v) }
+      elsif value.is_a?(Enumerable)
+        value.collect { |v| json_safe(v) }
+      else
+        value
       end
     end
   end

@@ -481,6 +481,48 @@ RSpec.describe Lumberjack::JsonDevice do
     end
   end
 
+  describe "as_json support" do
+    let(:obj) do
+      Object.new.tap do |o|
+        def o.as_json(options = nil)
+          {"foo" => "bar"}
+        end
+      end
+    end
+
+    it "calls as_json on the message" do
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, obj, nil, 12345, {})
+      device = Lumberjack::JsonDevice.new(output, mapping: {message: "message"})
+      device.write(entry)
+      line = output.string.chomp
+      expect(JSON.parse(line)["message"]).to eq({"foo" => "bar"})
+    end
+
+    it "calls as_json on the progname" do
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", obj, 12345, {})
+      device = Lumberjack::JsonDevice.new(output, mapping: {progname: "progname"})
+      device.write(entry)
+      line = output.string.chomp
+      expect(JSON.parse(line)["progname"]).to eq({"foo" => "bar"})
+    end
+
+    it "calls as_json on the attributes" do
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", "app", 12345, {"a" => obj})
+      device = Lumberjack::JsonDevice.new(output)
+      device.write(entry)
+      line = output.string.chomp
+      expect(JSON.parse(line)["tags"]).to eq({"a" => {"foo" => "bar"}})
+    end
+
+    it "calls as_json on nested values" do
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", "app", 12345, {"a" => ["d", {"b" => obj}]})
+      device = Lumberjack::JsonDevice.new(output)
+      device.write(entry)
+      line = output.string.chomp
+      expect(JSON.parse(line)["tags"]).to eq({"a" => ["d", {"b" => {"foo" => "bar"}}]})
+    end
+  end
+
   describe "post_processor" do
     it "can provide a post processor to modify the log entry before writing" do
       post_processor = ->(data) { data.transform_keys(&:upcase) }
