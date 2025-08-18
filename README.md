@@ -186,7 +186,7 @@ param_filter = ActiveSupport::ParameterFilter.new(Rails.application.config.filte
 device = Lumberjack::JsonDevice.new(STDOUT, post_processor: ->(data) { param_filter.filter(data) }
 ```
 
-Note that all hash keys will be strings.If the post processor does not return a hash, it will be ignored.
+Note that all hash keys will be strings and the values will be JSON-safe. If the post processor does not return a hash, it will be ignored.
 
 ### Pretty Printing
 
