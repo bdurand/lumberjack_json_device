@@ -184,7 +184,7 @@ RSpec.describe Lumberjack::JsonDevice do
         "foo.bar": true,
         attributes: true
       }
-      attributes = Lumberjack::Utils.flatten_tags({
+      attributes = Lumberjack::Utils.flatten_attributes({
         "foo" => {"bar" => "boo"},
         "baz" => "bip"
       })
@@ -534,7 +534,7 @@ RSpec.describe Lumberjack::JsonDevice do
       device = Lumberjack::JsonDevice.new(output)
       device.write(entry)
       line = output.string.chomp
-      expect(JSON.parse(line)["tags"]).to eq({"a" => {"foo" => "bar"}})
+      expect(JSON.parse(line)["attributes"]).to eq({"a" => {"foo" => "bar"}})
     end
 
     it "calls as_json on nested values" do
@@ -542,7 +542,7 @@ RSpec.describe Lumberjack::JsonDevice do
       device = Lumberjack::JsonDevice.new(output)
       device.write(entry)
       line = output.string.chomp
-      expect(JSON.parse(line)["tags"]).to eq({"a" => ["d", {"b" => {"foo" => "bar"}}]})
+      expect(JSON.parse(line)["attributes"]).to eq({"a" => ["d", {"b" => {"foo" => "bar"}}]})
     end
   end
 

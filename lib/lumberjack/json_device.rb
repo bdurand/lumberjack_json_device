@@ -2,6 +2,7 @@
 
 require "lumberjack"
 require "json"
+require "time"
 
 module Lumberjack
   # This Lumberjack device logs output to another device as JSON formatted text with one document per line.
@@ -160,28 +161,27 @@ module Lumberjack
       data = {}
       set_attribute(data, @time_key, entry.time) if @time_key
       set_attribute(data, @severity_key, entry.severity_label) if @severity_key
-      set_attribute(data, @message_key, entry.message) if @message_key
-      set_attribute(data, @progname_key, entry.progname) if @progname_key
+      set_attribute(data, @message_key, json_safe(entry.message)) if @message_key
+      set_attribute(data, @progname_key, json_safe(entry.progname)) if @progname_key && entry.progname
       set_attribute(data, @pid_key, entry.pid) if @pid_key
 
-      attributes = Lumberjack::Utils.expand_attributes(entry.attributes) if entry.attributes
-      extracted_attributes = nil
-      if @custom_keys.size > 0 && !attributes&.empty?
-        extracted_attributes = []
-        @custom_keys.each do |name, key|
-          set_attribute(data, key, attribute_value(attributes, name))
-          extracted_attributes << name
-        end
+      attributes = entry.attributes.transform_values { |value| json_safe(value) } if entry.attributes
 
-        extracted_attributes.each do |path|
-          attributes = deep_remove_attribute(attributes, path, entry.attributes)
+      if @custom_keys.size > 0 && !attributes&.empty?
+        @custom_keys.each do |name, key|
+          name = name.is_a?(Array) ? name.join(".") : name.to_s
+          value = attributes.delete(name)
+          next if value.nil?
+
+          value = Lumberjack::Utils.expand_attributes(value) if value.is_a?(Hash)
+          set_attribute(data, key, value)
         end
       end
 
-      if @attributes_key
-        attributes ||= {}
+      if @attributes_key && !attributes&.empty?
+        attributes = Lumberjack::Utils.expand_attributes(attributes)
         if @attributes_key == "*"
-          data = attributes.merge(data) unless attributes.empty?
+          attributes.each { |k, v| data[k] = v unless data.include?(k) }
         else
           set_attribute(data, @attributes_key, attributes)
         end
@@ -198,50 +198,14 @@ module Lumberjack
 
     private
 
-    def attribute_value(attributes, name)
-      return nil if attributes.nil?
-      return attributes[name] unless name.is_a?(Array)
-
-      val = attributes[name.first]
-      return val if name.length == 1
-      return nil unless val.is_a?(Hash)
-
-      attribute_value(val, name[1, name.length])
-    end
-
-    def deep_remove_attribute(attributes, path, original_attributes)
-      return nil if attributes.nil?
-
-      dup_needed = attributes.equal?(original_attributes)
-      key = path.first
-      val = attributes[key] if path.length > 1
-      unless val.is_a?(Hash)
-        if attributes.include?(key)
-          attributes = attributes.dup if dup_needed
-          attributes.delete(key)
-        end
-        return attributes
-      end
-
-      new_val = deep_remove_attribute(val, path[1, path.length], original_attributes[key])
-      if new_val.empty? || !new_val.equal?(val)
-        attributes = attributes.dup if dup_needed
-        if new_val.empty?
-          attributes.delete(key)
-        else
-          attributes[key] = new_val
-        end
-      end
-
-      attributes
-    end
-
     def set_attribute(data, key, value)
       return if value.nil?
 
       if (value.is_a?(Time) || value.is_a?(DateTime)) && @time_formatter
         value = @time_formatter.call(value)
       end
+
+      key = key.split(".") if key.is_a?(String) && key.include?(".")
 
       if key.is_a?(Array)
         unless key.empty?
@@ -258,7 +222,7 @@ module Lumberjack
           deep_merge!(data, hash)
         end
       else
-        data[key] = value unless key.nil?
+        data[key.to_s] = value unless key.nil?
       end
     end
 
@@ -293,6 +257,23 @@ module Lumberjack
         else
           other_val
         end
+      end
+    end
+
+    def json_safe(value)
+      return nil if value.nil?
+
+      # Check if the as_json method is defined takes no parameters
+      as_json_arity = value.method(:as_json).arity if value.respond_to?(:as_json)
+
+      if as_json_arity == 0 || as_json_arity == -1
+        value.as_json
+      elsif value.is_a?(Hash)
+        value.transform_values { |v| json_safe(v) }
+      elsif value.is_a?(Enumerable)
+        value.collect { |v| json_safe(v) }
+      else
+        value
       end
     end
   end
