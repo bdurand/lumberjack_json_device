@@ -5,8 +5,6 @@ on:
     branches:
       - main
       - actions-*
-    tags:
-      - v*
   pull_request:
     branches-ignore:
       - actions-*
@@ -29,7 +27,6 @@ jobs:
             standardrb: true
           - ruby: "3.0"
           - ruby: "2.7"
-          - ruby: "2.5"
     steps:
     - uses: actions/checkout@v4
     - name: Set up Ruby
