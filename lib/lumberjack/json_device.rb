@@ -35,6 +35,8 @@ module Lumberjack
 
     DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%6N%z"
 
+    DeviceRegistry.add(:json, self)
+
     attr_accessor :formatter
     attr_accessor :post_processor
     attr_writer :pretty

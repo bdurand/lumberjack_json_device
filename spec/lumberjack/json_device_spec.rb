@@ -6,6 +6,12 @@ RSpec.describe Lumberjack::JsonDevice do
   let(:output) { StringIO.new }
   let(:entry) { Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar", "baz" => "boo") }
 
+  describe "registry" do
+    it "should register the device" do
+      expect(Lumberjack::DeviceRegistry.device_class(:json)).to eq(Lumberjack::JsonDevice)
+    end
+  end
+
   describe "entry_as_json" do
     it "should have a default mapping of the entry fields" do
       device = Lumberjack::JsonDevice.new(output)
