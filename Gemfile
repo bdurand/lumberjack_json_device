@@ -2,7 +2,7 @@ source "https://rubygems.org"
 
 gemspec
 
-gem "lumberjack", github: "bdurand/lumberjack", branch: "lumberjack_2"
+gem "lumberjack", path: "../lumberjack" # github: "bdurand/lumberjack", branch: "lumberjack_2"
 
 gem "dotenv"
 gem "rspec", "~> 3.10"

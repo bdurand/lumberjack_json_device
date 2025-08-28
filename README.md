@@ -14,7 +14,7 @@ This gem provides a logging device for the [`lumberjack`](https://github.com/bdu
 require 'lumberjack_json_device'
 
 # Create a logger with JSON output to STDOUT
-logger = Lumberjack::Logger.new(Lumberjack::JsonDevice.new(STDOUT))
+logger = Lumberjack::Logger.new(Lumberjack::JsonDevice.new(output: STDOUT))
 
 # Log a message with attributes
 logger.info("User logged in", user_id: 123, session_id: "abc")
@@ -26,12 +26,11 @@ logger.info("User logged in", user_id: 123, session_id: "abc")
 You can send the JSON output to either a stream or to another Lumberjack device.
 
 ```ruby
-# Send to STDOUT
-device = Lumberjack::JsonDevice.new(STDOUT)
+# Send to stream (STDOUT is the default)
+device = Lumberjack::JsonDevice.new(output: STDOUT)
 
-# Send to another logging device
-log_file = Lumberjack::Device::LogFile.new("/var/log/app.log")
-device = Lumberjack::JsonDevice.new(log_file)
+# Send to a log file
+device = Lumberjack::JsonDevice.new(output: "/var/log/app.log")
 ```
 
 ### JSON Structure
@@ -55,15 +54,18 @@ You can customize the JSON document structure by providing a mapping that specif
 You can map the standard field names (`time`, `severity`, `progname`, `pid`, `message`, and `attributes`) as well as extract specific attributes by name.
 
 ```ruby
-device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
-  time: "timestamp",
-  severity: "level",
-  progname: ["app", "name"],
-  pid: ["app", "pid"],
-  message: "message",
-  duration: "duration",  # Extracts the "duration" attribute
-  attributes: "attributes"
-})
+device = Lumberjack::JsonDevice.new(
+  output: STDOUT,
+  mapping: {
+    time: "timestamp",
+    severity: "level",
+    progname: ["app", "name"],
+    pid: ["app", "pid"],
+    message: "message",
+    duration: "duration",  # Extracts the "duration" attribute
+    attributes: "attributes"
+  }
+)
 ```
 
 ```json
@@ -75,12 +77,15 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
 If you omit fields from the mapping or set them to `false`, they will not appear in the JSON output:
 
 ```ruby
-device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
-  time: "timestamp",
-  severity: "level",
-  message: "message",
-  pid: false  # Exclude PID from output
-})
+device = Lumberjack::JsonDevice.new(
+  output: STDOUT,
+  mapping: {
+    time: "timestamp",
+    severity: "level",
+    message: "message",
+    pid: false  # Exclude PID from output
+  }
+)
 ```
 
 ```json
@@ -92,11 +97,14 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
 You can provide a callable object (proc, lambda, or any object responding to `call`) to transform field values. The callable receives the original value and should return a hash that will be merged into the JSON document:
 
 ```ruby
-device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
-  time: lambda { |val| {timestamp: (val.to_f * 1000).round} },
-  severity: "level",
-  message: "message"
-})
+device = Lumberjack::JsonDevice.new(
+  output: STDOUT,
+  mapping: {
+    time: lambda { |val| {timestamp: (val.to_f * 1000).round} },
+    severity: "level",
+    message: "message"
+  }
+)
 ```
 
 ```json
@@ -108,14 +116,17 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
 Use `true` as a shortcut to map a field to the same name:
 
 ```ruby
-device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
-  time: "timestamp",
-  severity: true,      # Maps to "severity"
-  progname: true,      # Maps to "progname"
-  pid: false,          # Excluded from output
-  message: "message",
-  attributes: true     # Maps to "attributes"
-})
+device = Lumberjack::JsonDevice.new(
+  output: STDOUT,
+  mapping: {
+    time: "timestamp",
+    severity: true,      # Maps to "severity"
+    progname: true,      # Maps to "progname"
+    pid: false,          # Excluded from output
+    message: "message",
+    attributes: true     # Maps to "attributes"
+  }
+)
 ```
 
 #### Tag Extraction and Dot Notation
@@ -123,13 +134,16 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
 You can extract specific attributes from the log entry and map them to custom locations in the JSON. Tags with dot notation in their names are automatically expanded into nested structures:
 
 ```ruby
-device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
-  "message" => true,
-  "http.status" => true,    # Extracts "http.status" attribute
-  "http.method" => true,    # Extracts "http.method" attribute
-  "http.path" => true,      # Extracts "http.path" attribute
-  "attributes" => true
-})
+device = Lumberjack::JsonDevice.new(
+  output: STDOUT,
+  mapping: {
+    "message" => true,
+    "http.status" => true,    # Extracts "http.status" attribute
+    "http.method" => true,    # Extracts "http.method" attribute
+    "http.path" => true,      # Extracts "http.path" attribute
+    "attributes" => true
+  }
+)
 ```
 
 ```json
@@ -143,10 +157,13 @@ device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
 Use `"*"` as the attributes mapping value to copy all remaining attributes directly to the root level of the JSON document:
 
 ```ruby
-device = Lumberjack::JsonDevice.new(STDOUT, mapping: {
-  "message" => true,
-  "attributes" => "*"
-})
+device = Lumberjack::JsonDevice.new(
+  output: STDOUT,
+  mapping: {
+    "message" => true,
+    "attributes" => "*"
+  }
+)
 ```
 
 ```json
@@ -188,7 +205,10 @@ You can provide a post processor that will be called on the hash before it is se
 ```ruby
 # Filter out sensitive elements using Rails parameter filter
 param_filter = ActiveSupport::ParameterFilter.new(Rails.application.config.filter_parameters)
-device = Lumberjack::JsonDevice.new(STDOUT, post_processor: ->(data) { param_filter.filter(data) })
+device = Lumberjack::JsonDevice.new(
+  output: STDOUT,
+  post_processor: ->(data) { param_filter.filter(data) }
+)
 ```
 
 Note that all hash keys will be strings and the values will be JSON-safe. If the post processor does not return a hash, it will be ignored.
@@ -198,7 +218,7 @@ Note that all hash keys will be strings and the values will be JSON-safe. If the
 For development or debugging, you can format the JSON output with indentation and newlines by setting the `pretty` option to `true`:
 
 ```ruby
-device = Lumberjack::JsonDevice.new(STDOUT, pretty: true)
+device = Lumberjack::JsonDevice.new(output: STDOUT, pretty: true)
 ```
 
 This will format each log entry as multi-line JSON instead of single-line output. You can check if pretty formatting is enabled using the `pretty?` method:
@@ -215,15 +235,17 @@ Log entries with empty or nil messages will not be written to the output.
 
 The `JsonDevice` constructor accepts the following options:
 
+- **`output`**: The output stream, file path, or Lumberjack device to write to (default: STDOUT)
 - **`mapping`**: Hash defining how log fields should be mapped to JSON (default: maps all standard fields)
 - **`formatter`**: Custom `Lumberjack::Formatter` instance for formatting values before JSON serialization
 - **`datetime_format`**: String format for Time/DateTime objects (default: `"%Y-%m-%dT%H:%M:%S.%6N%z"`)
 - **`post_processor`**: Callable that receives and can modify the final hash before JSON serialization
 - **`pretty`**: Boolean to enable pretty-printed JSON output (default: `false`)
+- **`utc`**: Boolean to force timestamps to UTC before formatting (default: `false`)
 
 ```ruby
 device = Lumberjack::JsonDevice.new(
-  STDOUT,
+  output: STDOUT,
   mapping: { time: "timestamp", message: true, attributes: "*" },
   datetime_format: "%Y-%m-%d %H:%M:%S",
   pretty: true,

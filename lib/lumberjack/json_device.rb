@@ -4,8 +4,12 @@ require "lumberjack"
 require "json"
 require "time"
 
+# Lumberjack is a simple, powerful, and fast logging library for Ruby that
+# provides a consistent interface for logging across different output streams.
 module Lumberjack
   # This Lumberjack device logs output to another device as JSON formatted text with one document per line.
+  # This format (JSONL) is ideal for structured logging pipelines and can be easily consumed by log
+  # aggregation services, search engines, and monitoring tools.
   #
   # The mapping parameter can be used to define the JSON data structure. To define the structure pass in a
   # hash with key indicating the log entry field and the value indicating the JSON document key.
@@ -24,6 +28,9 @@ module Lumberjack
   #
   # You can create a nested JSON structure by specifying an array as the JSON key.
   class JsonDevice < Device
+    VERSION = File.read(File.join(__dir__, "..", "..", "VERSION"))
+
+    # Default mapping for standard log entry fields to JSON keys.
     DEFAULT_MAPPING = {
       time: true,
       severity: true,
@@ -33,73 +40,123 @@ module Lumberjack
       attributes: true
     }.freeze
 
+    # Default ISO 8601 datetime format with microsecond precision and timezone offset.
     DEFAULT_TIME_FORMAT = "%Y-%m-%dT%H:%M:%S.%6N%z"
 
+    # Classes that can be serialized directly to JSON without transformation.
+    JSON_NATIVE_CLASSES = [String, NilClass, Numeric, TrueClass, FalseClass].freeze
+    private_constant :JSON_NATIVE_CLASSES
+
+    # Valid options that can be passed to the JsonDevice constructor.
+    JSON_OPTIONS = [:output, :mapping, :formatter, :datetime_format, :post_processor, :pretty].freeze
+    private_constant :JSON_OPTIONS
+
+    # Register the JsonDevice with the device registry for easier instantiation.
     DeviceRegistry.add(:json, self)
 
+    # @!attribute [rw] formatter
+    #   @return [Lumberjack::Formatter] The formatter used to format log entry values before JSON serialization.
     attr_accessor :formatter
+
+    # @!attribute [rw] post_processor
+    #   @return [Proc] A callable object that can modify the log entry hash before JSON serialization.
     attr_accessor :post_processor
+
+    # @!attribute [w] pretty
+    #   @param value [Boolean] Whether to enable pretty-printed JSON output.
     attr_writer :pretty
+
+    # @!attribute [r] mapping
+    #   @return [Hash] The current field mapping configuration.
     attr_reader :mapping
 
-    # @param stream_or_device [IO, Lumberjack::Device] The output stream or Lumberjack device to write
-    #  the JSON formatted log entries to.
-    # @param mapping [Hash] A hash where the key is the log entry field name and the value indicates how
+    # Create a new JsonDevice instance.
+    #
+    # @param options [Hash<Symbol, Object>] The options for the JSON device.
+    # @param deprecated_options [Hash<Symbol, Object>] The device options for the JSON device if the output
+    #   stream or device is specified in the first argument. This is deprecated behavior for backward
+    #   compatibility with version 2.x.
+    # @option options [IO, Lumberjack::Device] :output The output stream or Lumberjack device to write
+    #   the JSON formatted log entries to. Defaults to STDOUT.
+    # @option options [Hash] :mapping A hash where the key is the log entry field name and the value indicates how
     #   to map the field if it exists. If the value is `true`, the field will be mapped to the same name.
-    #   If the value is an array, it will be mapped to a nested structure that follows the array elements.
+    #   If the value is a String, the field will be mapped to that key name.
+    #   If the value is an Array, it will be mapped to a nested structure that follows the array elements.
     #   If the value is a callable object, it will be called with the value and is expected to return
     #   a hash that will be merged into the JSON document.
-    #   If the value is `false`, the field will not be included in the JSON output.
-    # @param formatter [Lumberjack::Formatter] An optional formatter to use for formatting the log entry data.
-    # @param datetime_format [String] An optional datetime format string to use for formatting the log timestamp.
-    # @param post_processor [Proc] An optional callable object that will be called with the log entry hash
+    #   If the value is `false` or `nil`, the field will not be included in the JSON output.
+    #   Special value `"*"` for `:attributes` will flatten all remaining attributes to the root level.
+    # @option options [Lumberjack::Formatter] :formatter An optional formatter to use for formatting the log entry data.
+    # @option options [String] :datetime_format An optional datetime format string to use for formatting the log timestamp.
+    #   Defaults to ISO 8601 format with microsecond precision.
+    # @option options [Proc] :post_processor An optional callable object that will be called with the log entry hash
     #   before it is written to the output stream. This can be used to modify the log entry data
-    #   before it is serialized to JSON.
-    # @param pretty [Boolean] If true, the output will be formatted as pretty JSON with indentation and newlines.
+    #   before it is serialized to JSON. The callable should return a Hash or the result will be ignored.
+    # @option options [Boolean] :pretty If true, the output will be formatted as pretty JSON with indentation and newlines.
     #   The default is false, which writes each log entry as a single line JSON document.
-    def initialize(stream_or_device, mapping: DEFAULT_MAPPING, formatter: nil, datetime_format: nil, post_processor: nil, pretty: false)
+    # @option options [Boolean] :utc If true, all times will be converted to UTC before formatting.
+    def initialize(options = {}, deprecated_options = nil)
+      unless options.is_a?(Hash)
+        Lumberjack::Utils.deprecated(:new, "Passing a stream or device as the first argument is no longer supported. Specify the output stream in the :output key of the options hash.") do
+          options = (deprecated_options || {}).merge(output: options)
+        end
+      end
+
       @mutex = Mutex.new
 
-      @device = if stream_or_device.is_a?(Device)
-        stream_or_device
-      else
-        Lumberjack::Device::Writer.new(stream_or_device)
-      end
+      @output = output_stream(options[:output], options.except(*JSON_OPTIONS))
 
-      self.mapping = mapping
+      self.mapping = options.fetch(:mapping, DEFAULT_MAPPING)
 
-      if formatter
-        @formatter = formatter
-      else
-        @formatter = default_formatter
-        datetime_format = DEFAULT_TIME_FORMAT if datetime_format.nil?
-      end
-      add_datetime_formatter!(datetime_format) unless datetime_format.nil?
+      @force_utc = options.fetch(:utc, false)
+      @formatter = default_formatter
+      self.datetime_format = options.fetch(:datetime_format, DEFAULT_TIME_FORMAT)
+      @formatter.include(options[:formatter]) if options[:formatter]
 
-      @post_processor = post_processor
+      @post_processor = options[:post_processor]
 
-      @pretty = !!pretty
+      @pretty = !!options[:pretty]
     end
 
+    # Write a log entry to the output stream as JSON.
+    # Empty log entries (nil or empty message) are ignored.
+    #
+    # @param entry [Lumberjack::LogEntry] The log entry to write.
+    # @return [void]
     def write(entry)
       return if entry.empty?
 
       data = entry_as_json(entry)
       json = @pretty ? JSON.pretty_generate(data) : JSON.generate(data)
-      @device.write(json)
+      @output.write(json)
     end
 
+    # Get the underlying device from the output stream.
+    #
+    # @return [#writer] The underlying device.
+    def dev
+      @output.dev
+    end
+
+    # Flush the output stream.
+    #
+    # @return [void]
     def flush
-      @device.flush
+      @output.flush
     end
 
+    # @!attribute [r] datetime_format
+    #   @return [String] The current datetime format string.
     attr_reader :datetime_format
 
     # Set the datetime format for the log timestamp.
     #
     # @param format [String] The datetime format string to use for formatting the log timestamp.
     def datetime_format=(format)
-      add_datetime_formatter!(format)
+      @datetime_format = format
+      fmttr = time_formatter(datetime_format: format, force_utc: @force_utc)
+      @formatter.add(Time, fmttr)
+      @formatter.add(DateTime, fmttr)
     end
 
     # Return true if the output is written in a multi-line pretty format. The default is to write each
@@ -138,6 +195,7 @@ module Lumberjack
         @custom_keys = keys.map do |name, key|
           [name.to_s.split("."), key]
         end.to_h
+
         @mapping = mapping
       end
     end
@@ -200,12 +258,36 @@ module Lumberjack
 
     private
 
+    def output_stream(output, options)
+      output ||= $stdout
+
+      if output.is_a?(Lumberjack::Device)
+        output
+      elsif output.is_a?(String) || (defined?(Pathname) && output.is_a?(Pathname))
+        Lumberjack::Device::LoggerFile.new(output, options)
+      else
+        Lumberjack::Device::Writer.new(output, options)
+      end
+    end
+
+    def default_formatter
+      json_formatter = ->(value) { json_safe(value) }
+
+      Lumberjack::Formatter.build do
+        add(::Enumerable, Lumberjack::Formatter::StructuredFormatter.new(self))
+        add(::Object, json_formatter)
+      end
+    end
+
+    def time_formatter(datetime_format: nil, force_utc: false)
+      lambda do |time|
+        time = time.utc if force_utc && !time.utc?
+        datetime_format ? time.strftime(datetime_format) : time
+      end
+    end
+
     def set_attribute(data, key, value)
       return if value.nil?
-
-      if (value.is_a?(Time) || value.is_a?(DateTime)) && @time_formatter
-        value = @time_formatter.call(value)
-      end
 
       key = key.split(".") if key.is_a?(String) && key.include?(".")
 
@@ -228,29 +310,8 @@ module Lumberjack
       end
     end
 
-    def default_formatter
-      formatter = Formatter.new.clear
-      object_formatter = Lumberjack::Formatter::ObjectFormatter.new
-      formatter.add(String, object_formatter)
-      formatter.add(Object, object_formatter)
-      formatter.add(Enumerable, Formatter::StructuredFormatter.new(formatter))
-      formatter
-    end
-
-    def add_datetime_formatter!(datetime_format)
-      if datetime_format
-        @datetime_format = datetime_format
-        time_formatter = Lumberjack::Formatter::DateTimeFormatter.new(datetime_format)
-        formatter.add(Time, time_formatter)
-        formatter.add(Date, time_formatter)
-      else
-        @datetime_format = nil
-        formatter.remove(Time)
-        formatter.remove(Date)
-      end
-    end
-
     def deep_merge!(hash, other_hash, &block)
+      other_hash = other_hash.transform_keys(&:to_s)
       hash.merge!(other_hash) do |key, this_val, other_val|
         if this_val.is_a?(Hash) && other_val.is_a?(Hash)
           deep_merge!(this_val, other_val, &block)
@@ -263,19 +324,19 @@ module Lumberjack
     end
 
     def json_safe(value)
-      return nil if value.nil?
+      return value if JSON_NATIVE_CLASSES.include?(value.class)
 
       # Check if the as_json method is defined takes no parameters
-      as_json_arity = value.method(:as_json).arity if value.respond_to?(:as_json)
+      as_json_arity = value.method(:as_json).arity if !value.nil? && value.respond_to?(:as_json)
 
       if as_json_arity == 0 || as_json_arity == -1
         value.as_json
+      elsif !value.is_a?(Enumerable)
+        value
       elsif value.is_a?(Hash)
         value.transform_values { |v| json_safe(v) }
-      elsif value.is_a?(Enumerable)
-        value.collect { |v| json_safe(v) }
       else
-        value
+        value.collect { |v| json_safe(v) }
       end
     end
   end

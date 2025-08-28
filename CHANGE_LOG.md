@@ -9,6 +9,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Support for Lumberjack 2.0.
+- **Breaking Change** The constructor now takes an options hash rather than keyword arguments.
+- Added the `:output` key to the constructor options hash to specify the output stream. This argument can take either a stream or a file path.
+- Added `:utc` option to force timestamps to be in UTC.
 
 ### Changed
 
@@ -24,6 +27,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     attributes: ["tags"]
   }
 ```
+
+### Deprecated
+
+- Deprecated passing in the output stream as the first positional argument. The output stream should now be specified using the `:output` key in the options hash.
 
 ### Removed
 
