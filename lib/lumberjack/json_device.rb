@@ -76,8 +76,10 @@ module Lumberjack
     # @param deprecated_options [Hash<Symbol, Object>] The device options for the JSON device if the output
     #   stream or device is specified in the first argument. This is deprecated behavior for backward
     #   compatibility with version 2.x.
-    # @option options [IO, Lumberjack::Device] :output The output stream or Lumberjack device to write
-    #   the JSON formatted log entries to. Defaults to STDOUT.
+    # @option options [IO, Lumberjack::Device, Symbol, String, Pathname, nil] :output The output stream or
+    #   Lumberjack device to write the JSON formatted log entries to. If this is a string or Pathname,
+    #   then the output will be written to that file path. The values :stdout and :stderr can be used
+    #   to write to STDOUT and STDERR respectively. Defaults to STDOUT.
     # @option options [Hash] :mapping A hash where the key is the log entry field name and the value indicates how
     #   to map the field if it exists. If the value is `true`, the field will be mapped to the same name.
     #   If the value is a String, the field will be mapped to that key name.
@@ -268,6 +270,11 @@ module Lumberjack
       elsif output.is_a?(String) || (defined?(Pathname) && output.is_a?(Pathname))
         Lumberjack::Device::LoggerFile.new(output, options)
       else
+        if output == :stdout
+          output = $stdout
+        elsif output == :stderr
+          output = $stderr
+        end
         Lumberjack::Device::Writer.new(output, options)
       end
     end

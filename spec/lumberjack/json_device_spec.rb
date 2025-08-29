@@ -58,6 +58,34 @@ RSpec.describe Lumberjack::JsonDevice do
         expect(device.pretty?).to be true
       end
     end
+
+    it "can specify :stdout" do
+      save_stdout = $stdout
+      stdout = StringIO.new
+      device = nil
+      begin
+        $stdout = stdout
+        device = Lumberjack::JsonDevice.new(output: :stdout)
+      ensure
+        $stdout = save_stdout
+      end
+
+      expect(device.dev).to eq stdout
+    end
+
+    it "can specify :stderr" do
+      save_stderr = $stderr
+      stderr = StringIO.new
+      device = nil
+      begin
+        $stderr = stderr
+        device = Lumberjack::JsonDevice.new(output: :stderr)
+      ensure
+        $stderr = save_stderr
+      end
+
+      expect(device.dev).to eq stderr
+    end
   end
 
   describe "entry_as_json" do
