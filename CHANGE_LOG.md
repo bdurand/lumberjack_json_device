@@ -4,6 +4,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 3.0.0
+
+### Added
+
+- Support for Lumberjack 2.0.
+- **Breaking Change** The constructor now takes an options hash rather than keyword arguments.
+- Added the `:output` key to the constructor options hash to specify the output stream. This argument can take either a stream or a file path.
+- Added `:utc` option to force timestamps to be in UTC.
+
+### Changed
+
+- **Breaking Change** Tags are now called attributes and are put in the `"attributes"` JSON field by default. If you want to keep the old behavior, you will need to set the mapping to:
+
+```ruby
+  {
+    time: true,
+    severity: true,
+    progname: true,
+    pid: true,
+    message: true,
+    attributes: ["tags"]
+  }
+```
+
+### Deprecated
+
+- Deprecated passing in the output stream as the first positional argument. The output stream should now be specified using the `:output` key in the options hash.
+
+### Removed
+
+- Support for Ruby versions less than 2.7
+
 ## 2.2.1
 
 ## Changed
@@ -35,9 +67,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Tag structure is now consistently expanded from dot notation into nested hashes in the `tag` field. Previoulsly this was only done when the template copied tags to the root level of the JSON document.
+- Tag structure is now consistently expanded from dot notation into nested hashes in the `attribute` field. Previoulsly this was only done when the template copied attributes to the root level of the JSON document.
 - The mapping options now supports setting the value to `false` to exclude a field from the JSON output.
-- Tag mapping can now be set to `"*"` to copy all tags into the root of the JSON document.
+- Tag mapping can now be set to `"*"` to copy all attributes into the root of the JSON document.
 
 ### Removed
 
