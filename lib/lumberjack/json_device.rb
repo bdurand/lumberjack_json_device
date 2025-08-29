@@ -332,8 +332,9 @@ module Lumberjack
       end
     end
 
-    def json_safe(value)
+    def json_safe(value, seen = nil)
       return value if JSON_NATIVE_CLASSES.include?(value.class)
+      return nil if seen&.include?(value.object_id)
 
       # Check if the as_json method is defined takes no parameters
       as_json_arity = value.method(:as_json).arity if !value.nil? && value.respond_to?(:as_json)
@@ -342,11 +343,20 @@ module Lumberjack
         value.as_json
       elsif !value.is_a?(Enumerable)
         value
-      elsif value.is_a?(Hash)
-        value.transform_values { |v| json_safe(v) }
       else
-        value.collect { |v| json_safe(v) }
+        seen ||= Set.new
+        seen << value.object_id
+        if value.is_a?(Hash)
+          value.transform_values { |v| json_safe(v, seen) }
+        else
+          value.collect { |v| json_safe(v, seen) }
+        end
       end
+    rescue SystemStackError, StandardError => e
+      error_message = e.class.name
+      error_message = "#{error_message} #{e.message}" if e.message && e.message != ""
+      warn("<Error serializing #{value.class} to JSON: #{error_message}>")
+      "<Error serializing #{value.class} to JSON: #{error_message}>"
     end
   end
 end

@@ -36,6 +36,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Support for Ruby versions less than 2.7
 
+## 2.2.1
+
+## Changed
+
+- Added error handling for JSON serialization. This ensures that logs can still be written to even if an error occurs during serialization.
+
 ## 2.2.0
 
 ### Changed
