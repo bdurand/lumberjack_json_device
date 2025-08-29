@@ -317,7 +317,6 @@ RSpec.describe Lumberjack::JsonDevice do
         attributes: "*"
       }
       attributes = {
-        "severity" => "bap",
         "foo.bar" => "boo",
         "mip" => "map"
       }
@@ -329,6 +328,27 @@ RSpec.describe Lumberjack::JsonDevice do
         "message" => entry.message,
         "foo" => {"bar" => "boo"},
         "mip" => "map"
+      })
+    end
+
+    it "cannot override explicit root values with splat attributes" do
+      mapping = {
+        severity: true,
+        message: true,
+        attributes: "*"
+      }
+      attributes = {
+        "severity" => "fatal",
+        "message" => "Go west young man",
+        "foo" => "bar"
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, attributes)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({
+        "severity" => entry.severity_label,
+        "message" => entry.message,
+        "foo" => "bar"
       })
     end
 

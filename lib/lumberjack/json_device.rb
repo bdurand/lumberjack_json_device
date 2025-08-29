@@ -34,9 +34,9 @@ module Lumberjack
     DEFAULT_MAPPING = {
       time: true,
       severity: true,
+      message: true,
       progname: true,
       pid: true,
-      message: true,
       attributes: true
     }.freeze
 
@@ -104,7 +104,9 @@ module Lumberjack
 
       @mutex = Mutex.new
 
-      @output = output_stream(options[:output], options.except(*JSON_OPTIONS))
+      stream_options = options.dup
+      JSON_OPTIONS.each { |key| stream_options.delete(key) }
+      @output = output_stream(options[:output], stream_options)
 
       self.mapping = options.fetch(:mapping, DEFAULT_MAPPING)
 
@@ -188,9 +190,9 @@ module Lumberjack
 
         @time_key = keys.delete(:time)
         @severity_key = keys.delete(:severity)
+        @message_key = keys.delete(:message)
         @progname_key = keys.delete(:progname)
         @pid_key = keys.delete(:pid)
-        @message_key = keys.delete(:message)
         @attributes_key = keys.delete(:attributes)
         @custom_keys = keys.map do |name, key|
           [name.to_s.split("."), key]
