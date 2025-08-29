@@ -229,7 +229,7 @@ module Lumberjack
 
       attributes = entry.attributes.transform_values { |value| json_safe(value) } if entry.attributes
 
-      if @custom_keys.size > 0 && !attributes&.empty?
+      if @custom_keys.size > 0 && attributes && !attributes&.empty?
         @custom_keys.each do |name, key|
           name = name.is_a?(Array) ? name.join(".") : name.to_s
           value = attributes.delete(name)
