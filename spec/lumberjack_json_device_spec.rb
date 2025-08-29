@@ -521,6 +521,36 @@ RSpec.describe Lumberjack::JsonDevice do
       line = output.string.chomp
       expect(JSON.parse(line)["tags"]).to eq({"a" => ["d", {"b" => {"foo" => "bar"}}]})
     end
+
+    it "ignores self references in hashes" do
+      circular_reference = {"one" => 1}
+      circular_reference["self"] = circular_reference
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", "app", 12345, circular_reference)
+      device = Lumberjack::JsonDevice.new(output)
+      device.write(entry)
+      line = output.string.chomp
+      expect(JSON.parse(line)["tags"]["self"]).to be_nil
+    end
+
+    it "records an error value if the entry cannot be serialized" do
+      obj = Object.new
+      def obj.as_json
+        as_json
+      end
+
+      save_stderr = $stderr
+      begin
+        $stderr = StringIO.new
+        entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", "app", 12345, "foo" => obj)
+        device = Lumberjack::JsonDevice.new(output)
+        device.write(entry)
+      ensure
+        $stderr = save_stderr
+      end
+
+      line = output.string.chomp
+      expect(JSON.parse(line)["tags"]["foo"]).to include("Error serializing Object to JSON: SystemStackError")
+    end
   end
 
   describe "post_processor" do
