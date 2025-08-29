@@ -265,7 +265,7 @@ module Lumberjack
 
     def json_safe(value, seen = nil)
       return nil if value.nil?
-      return "<Circular Reference: #{value.class.name}>" if seen&.include?(value.object_id)
+      return nil if seen&.include?(value.object_id)
 
       # Check if the as_json method is defined takes no parameters
       as_json_arity = value.method(:as_json).arity if value.respond_to?(:as_json)

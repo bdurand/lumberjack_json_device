@@ -529,7 +529,7 @@ RSpec.describe Lumberjack::JsonDevice do
       device = Lumberjack::JsonDevice.new(output)
       device.write(entry)
       line = output.string.chomp
-      expect(JSON.parse(line)["tags"]["self"]).to be_nil
+      expect(JSON.parse(line)["tags"]).to eq({"one" => 1})
     end
 
     it "records an error value if the entry cannot be serialized" do
