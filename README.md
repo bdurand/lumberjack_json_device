@@ -18,7 +18,13 @@ logger = Lumberjack::Logger.new(Lumberjack::JsonDevice.new(output: STDOUT))
 
 # Log a message with attributes
 logger.info("User logged in", user_id: 123, session_id: "abc")
-# Output: {"time":"2020-01-02T19:47:45.123456-0800","severity":"INFO","progname":null,"pid":12345,"message":"User logged in","attributes":{"user_id":123,"session_id":"abc"}}
+```
+
+This will output JSON like:
+
+```json
+{"time":"2020-01-02T19:47:45.123456-0800","severity":"INFO","progname":null,"pid":12345,"message":"User logged in","attributes":{"user_id":123,"session_id":"abc"}}
+```
 ```
 
 ### Output Destinations
