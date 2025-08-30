@@ -4,7 +4,7 @@
 [![Ruby Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://github.com/testdouble/standard)
 [![Gem Version](https://badge.fury.io/rb/lumberjack_json_device.svg)](https://badge.fury.io/rb/lumberjack_json_device)
 
-This gem provides a logging device for the [`lumberjack`](https://github.com/bdurand/lumberjack) gem that outputs [JSONL](https://jsonlines.org/) formatted log entries to a stream. This format with one JSON document per line is ideal for structured logging pipelines and can be easily consumed by log aggregation services, search engines, and monitoring tools.
+This gem provides a logging device for the [lumberjack](https://github.com/bdurand/lumberjack) gem that outputs [JSONL](https://jsonlines.org/) formatted log entries to a stream. This format with one JSON document per line is ideal for structured logging pipelines and can be easily consumed by log aggregation services, search engines, and monitoring tools.
 
 ## Usage
 
