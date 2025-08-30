@@ -25,6 +25,7 @@ jobs:
         include:
           - ruby: "ruby"
             standardrb: true
+            yard: true
           - ruby: "3.0"
           - ruby: "2.7"
     steps:
@@ -41,3 +42,6 @@ jobs:
     - name: standardrb
       if: matrix.standardrb
       run:  bundle exec standardrb
+    - name: yard
+      if: matrix.yard
+      run:  bundle exec yard --fail-on-warning
