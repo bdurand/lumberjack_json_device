@@ -43,7 +43,7 @@ device = Lumberjack::JsonDevice.new(output: "/var/log/app.log")
 
 By default, the JSON document maps to the `Lumberjack::LogEntry` data structure and includes all standard fields:
 
-```json
+```
 {"time": "2020-01-02T19:47:45.123456-0800", "severity": "INFO", "progname": "web", "pid": 101, "message": "test", "attributes": {"foo": "bar"}}
 ```
 
@@ -74,7 +74,9 @@ device = Lumberjack::JsonDevice.new(
 )
 ```
 
-```json
+Example output:
+
+```
 {"timestamp": "2020-01-02T19:47:45.123456-0800", "level": "INFO", "app": {"name": "web", "pid": 101}, "message": "test", "duration": 5, "attributes": {"foo": "bar"}}
 ```
 
@@ -94,7 +96,9 @@ device = Lumberjack::JsonDevice.new(
 )
 ```
 
-```json
+Example output:
+
+```
 {"timestamp": "2020-01-02T19:47:45.123456-0800", "level": "INFO", "message": "test"}
 ```
 
@@ -106,14 +110,16 @@ You can provide a callable object (proc, lambda, or any object responding to `ca
 device = Lumberjack::JsonDevice.new(
   output: STDOUT,
   mapping: {
-    time: lambda { |val| {timestamp: (val.to_f * 1000).round} },
+    time: lambda { |val| { timestamp: (val.to_f * 1000).round } },
     severity: "level",
     message: "message"
   }
 )
 ```
 
-```json
+Example output:
+
+```
 {"timestamp": 1578125375588, "level": "INFO", "message": "test"}
 ```
 
@@ -152,7 +158,9 @@ device = Lumberjack::JsonDevice.new(
 )
 ```
 
-```json
+Example output:
+
+```
 {"message": "test", "http": {"status": 200, "method": "GET", "path": "/resource"}, "attributes": {"other": "values"}}
 ```
 
@@ -172,7 +180,9 @@ device = Lumberjack::JsonDevice.new(
 )
 ```
 
-```json
+Example output:
+
+```
 {"message": "test", "attribute1": "value", "attribute2": "value"}
 ```
 
