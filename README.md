@@ -22,8 +22,8 @@ logger.info("User logged in", user_id: 123, session_id: "abc")
 
 This will output JSON like:
 
-```json
-{"time":"2020-01-02T19:47:45.123456-0800","severity":"INFO","progname":null,"pid":12345,"message":"User logged in","attributes":{"user_id":123,"session_id":"abc"}}
+```
+{ "time":"2020-01-02T19:47:45.123456-0800","severity":"INFO","progname":null,"pid":12345,"message":"User logged in","attributes":{ "user_id":123,"session_id":"abc" } }
 ```
 ```
 
@@ -44,7 +44,7 @@ device = Lumberjack::JsonDevice.new(output: "/var/log/app.log")
 By default, the JSON document maps to the `Lumberjack::LogEntry` data structure and includes all standard fields:
 
 ```
-{"time": "2020-01-02T19:47:45.123456-0800", "severity": "INFO", "progname": "web", "pid": 101, "message": "test", "attributes": {"foo": "bar"}}
+{ "time": "2020-01-02T19:47:45.123456-0800", "severity": "INFO", "progname": "web", "pid": 101, "message": "test", "attributes": { "foo": "bar" } }
 ```
 
 #### Custom Field Mapping
@@ -77,7 +77,7 @@ device = Lumberjack::JsonDevice.new(
 Example output:
 
 ```
-{"timestamp": "2020-01-02T19:47:45.123456-0800", "level": "INFO", "app": {"name": "web", "pid": 101}, "message": "test", "duration": 5, "attributes": {"foo": "bar"}}
+{ "timestamp": "2020-01-02T19:47:45.123456-0800", "level": "INFO", "app": { "name": "web", "pid": 101 }, "message": "test", "duration": 5, "attributes": { "foo": "bar" } }
 ```
 
 #### Excluding Fields
@@ -99,7 +99,7 @@ device = Lumberjack::JsonDevice.new(
 Example output:
 
 ```
-{"timestamp": "2020-01-02T19:47:45.123456-0800", "level": "INFO", "message": "test"}
+{ "timestamp": "2020-01-02T19:47:45.123456-0800", "level": "INFO", "message": "test" }
 ```
 
 #### Custom Transformations
@@ -120,7 +120,7 @@ device = Lumberjack::JsonDevice.new(
 Example output:
 
 ```
-{"timestamp": 1578125375588, "level": "INFO", "message": "test"}
+{ "timestamp": 1578125375588, "level": "INFO", "message": "test" }
 ```
 
 #### Shortcut Mapping
@@ -161,7 +161,7 @@ device = Lumberjack::JsonDevice.new(
 Example output:
 
 ```
-{"message": "test", "http": {"status": 200, "method": "GET", "path": "/resource"}, "attributes": {"other": "values"}}
+{ "message": "test", "http": { "status": 200, "method": "GET", "path": "/resource" }, "attributes": { "other": "values" } }
 ```
 
 **Important**: All attributes are automatically expanded from dot notation into nested hash structures, not just extracted attributes. For example, if you have an attribute named `"user.profile.name"`, it will automatically become `{"user": {"profile": {"name": "value"}}}` in the attributes section.
@@ -183,7 +183,7 @@ device = Lumberjack::JsonDevice.new(
 Example output:
 
 ```
-{"message": "test", "attribute1": "value", "attribute2": "value"}
+{ "message": "test", "attribute1": "value", "attribute2": "value" }
 ```
 
 ### Data Formatting
