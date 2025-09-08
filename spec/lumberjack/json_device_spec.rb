@@ -6,6 +6,12 @@ RSpec.describe Lumberjack::JsonDevice do
   let(:output) { StringIO.new }
   let(:entry) { Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar", "baz" => "boo") }
 
+  describe "VERSION" do
+    it "has a version number" do
+      expect(Lumberjack::JsonDevice::VERSION).not_to be nil
+    end
+  end
+
   describe "registry" do
     it "should register the device" do
       expect(Lumberjack::DeviceRegistry.device_class(:json)).to eq(Lumberjack::JsonDevice)

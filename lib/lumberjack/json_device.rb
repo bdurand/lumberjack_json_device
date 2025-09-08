@@ -28,7 +28,7 @@ module Lumberjack
   #
   # You can create a nested JSON structure by specifying an array as the JSON key.
   class JsonDevice < Device
-    VERSION = File.read(File.join(__dir__, "..", "..", "VERSION"))
+    VERSION = File.read(File.join(__dir__, "..", "..", "VERSION")).strip.freeze
 
     # Default mapping for standard log entry fields to JSON keys.
     DEFAULT_MAPPING = {
