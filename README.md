@@ -25,7 +25,6 @@ This will output JSON like:
 ```
 { "time":"2020-01-02T19:47:45.123456-0800","severity":"INFO","progname":null,"pid":12345,"message":"User logged in","attributes":{ "user_id":123,"session_id":"abc" } }
 ```
-```
 
 ### Output Destinations
 
@@ -149,11 +148,11 @@ You can extract specific attributes from the log entry and map them to custom lo
 device = Lumberjack::JsonDevice.new(
   output: STDOUT,
   mapping: {
-    "message" => true,
-    "http.status" => true,    # Extracts "http.status" attribute
-    "http.method" => true,    # Extracts "http.method" attribute
-    "http.path" => true,      # Extracts "http.path" attribute
-    "attributes" => true
+    message: true,
+    "http.status": true,    # Extracts "http.status" attribute
+    "http.method": true,    # Extracts "http.method" attribute
+    "http.path": true,      # Extracts "http.path" attribute
+    attributes: true
   }
 )
 ```
@@ -174,8 +173,8 @@ Use `"*"` as the attributes mapping value to copy all remaining attributes direc
 device = Lumberjack::JsonDevice.new(
   output: STDOUT,
   mapping: {
-    "message" => true,
-    "attributes" => "*"
+    message: true,
+    attributes: "*"
   }
 )
 ```

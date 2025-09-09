@@ -11,6 +11,25 @@ module Lumberjack
   # This format (JSONL) is ideal for structured logging pipelines and can be easily consumed by log
   # aggregation services, search engines, and monitoring tools.
   #
+  # The device supports flexible field mapping to customize the JSON structure, datetime formatting,
+  # post-processing, and pretty printing for development use.
+  #
+  # @example Basic usage
+  #   device = Lumberjack::JsonDevice.new(output: STDOUT)
+  #   logger = Lumberjack::Logger.new(device)
+  #   logger.info("User logged in", user_id: 123)
+  #
+  # @example Custom field mapping
+  #   device = Lumberjack::JsonDevice.new(
+  #     output: STDOUT,
+  #     mapping: {
+  #       time: "timestamp",
+  #       severity: "level",
+  #       message: true,
+  #       attributes: "*"
+  #     }
+  #   )
+  #
   # The mapping parameter can be used to define the JSON data structure. To define the structure pass in a
   # hash with key indicating the log entry field and the value indicating the JSON document key.
   #
@@ -48,7 +67,7 @@ module Lumberjack
     private_constant :JSON_NATIVE_CLASSES
 
     # Valid options that can be passed to the JsonDevice constructor.
-    JSON_OPTIONS = [:output, :mapping, :formatter, :datetime_format, :post_processor, :pretty].freeze
+    JSON_OPTIONS = [:output, :mapping, :formatter, :datetime_format, :post_processor, :pretty, :utc].freeze
     private_constant :JSON_OPTIONS
 
     # Register the JsonDevice with the device registry for easier instantiation.
@@ -59,7 +78,7 @@ module Lumberjack
     attr_accessor :formatter
 
     # @!attribute [rw] post_processor
-    #   @return [Proc] A callable object that can modify the log entry hash before JSON serialization.
+    #   @return [Proc, nil] A callable object that can modify the log entry hash before JSON serialization.
     attr_accessor :post_processor
 
     # @!attribute [w] pretty
@@ -123,6 +142,7 @@ module Lumberjack
     end
 
     # Write a log entry to the output stream as JSON.
+    # Each entry is written as a single line JSON document (JSONL format) unless pretty printing is enabled.
     # Empty log entries (nil or empty message) are ignored.
     #
     # @param entry [Lumberjack::LogEntry] The log entry to write.
@@ -132,12 +152,12 @@ module Lumberjack
 
       data = entry_as_json(entry)
       json = @pretty ? JSON.pretty_generate(data) : JSON.generate(data)
-      @output.write(json)
+      @output.write("#{json}\n")
     end
 
     # Get the underlying device from the output stream.
     #
-    # @return [#writer] The underlying device.
+    # @return [Object] The underlying device.
     def dev
       @output.dev
     end
