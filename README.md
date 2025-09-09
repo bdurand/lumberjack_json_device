@@ -149,9 +149,9 @@ device = Lumberjack::JsonDevice.new(
   output: STDOUT,
   mapping: {
     message: true,
-    "http.status" => true,    # Extracts "http.status" attribute
-    "http.method" => true,    # Extracts "http.method" attribute
-    "http.path" => true,      # Extracts "http.path" attribute
+    "http.status": true,    # Extracts "http.status" attribute
+    "http.method": true,    # Extracts "http.method" attribute
+    "http.path": true,      # Extracts "http.path" attribute
     attributes: true
   }
 )

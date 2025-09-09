@@ -494,14 +494,17 @@ RSpec.describe Lumberjack::JsonDevice do
     end
 
     it "should write one document per line" do
-      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "line_1\nline_2", "test", 12345, "foo" => {"bar" => "line_1\nline_2"})
+      entry_1 = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "line_1\nline_2", "test", 12345, "foo" => {"bar" => "line_1\nline_2"})
+      entry_2 = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "entry_2", "test", 12345, nil)
       device = Lumberjack::JsonDevice.new(output: output)
-      device.write(entry)
+      device.write(entry_1)
+      device.write(entry_2)
       device.flush
       lines = output.string.chomp.split("\n")
       data = device.entry_as_json(entry)
-      expect(lines.length).to eq 1
-      expect(lines.first).to eq JSON.generate(data)
+      expect(lines.length).to eq 2
+      expect(JSON.parse(lines.first)["message"]).to eq "line_1\nline_2"
+      expect(JSON.parse(lines.last)["message"]).to eq "entry_2"
     end
 
     it "should allow writing out pretty JSON" do

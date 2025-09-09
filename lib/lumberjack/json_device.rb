@@ -24,7 +24,7 @@ module Lumberjack
   #     output: STDOUT,
   #     mapping: {
   #       time: "timestamp",
-  #       severity: "level", 
+  #       severity: "level",
   #       message: true,
   #       attributes: "*"
   #     }
@@ -152,8 +152,7 @@ module Lumberjack
 
       data = entry_as_json(entry)
       json = @pretty ? JSON.pretty_generate(data) : JSON.generate(data)
-      @output.write(json)
-      @output.write("\n") unless @pretty
+      @output.write("#{json}\n")
     end
 
     # Get the underlying device from the output stream.
