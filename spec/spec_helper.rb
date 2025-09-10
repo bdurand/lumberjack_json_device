@@ -14,15 +14,15 @@ RSpec.configure do |config|
 end
 
 def silence_deprecations
-  save_warning = ENV["LUMBERJACK_NO_DEPRECATION_WARNINGS"]
+  save_warning = ENV["LUMBERJACK_DEPRECATION_WARNINGS"]
   save_verbose = $VERBOSE
   begin
-    ENV["LUMBERJACK_NO_DEPRECATION_WARNINGS"] = "true"
+    ENV["LUMBERJACK_DEPRECATION_WARNINGS"] = "false"
     $VERBOSE = false
     begin
       yield
     ensure
-      ENV["LUMBERJACK_NO_DEPRECATION_WARNINGS"] = save_warning
+      ENV["LUMBERJACK_DEPRECATION_WARNINGS"] = save_warning
       $VERBOSE = save_verbose
     end
   end
