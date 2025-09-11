@@ -302,11 +302,9 @@ module Lumberjack
     end
 
     def default_formatter
-      json_formatter = ->(value) { json_safe(value) }
-
-      Lumberjack::Formatter.build do
-        add(::Enumerable, Lumberjack::Formatter::StructuredFormatter.new(self))
-        add(::Object, json_formatter)
+      Lumberjack::Formatter.build do |formatter|
+        formatter.add(::Enumerable, Lumberjack::Formatter::StructuredFormatter.new(formatter))
+        formatter.add(::Object) { |value| json_safe(value) }
       end
     end
 
