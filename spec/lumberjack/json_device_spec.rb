@@ -58,7 +58,7 @@ RSpec.describe Lumberjack::JsonDevice do
     end
 
     it "can specify the stream as the first argument (deprecated)" do
-      silence_deprecations do
+      Lumberjack::Utils.with_deprecation_mode("silent") do
         device = Lumberjack::JsonDevice.new(output: output, pretty: true)
         expect(device.dev).to eq output
         expect(device.pretty?).to be true
