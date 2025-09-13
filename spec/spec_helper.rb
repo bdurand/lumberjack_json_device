@@ -5,7 +5,7 @@ require "tempfile"
 
 require_relative "../lib/lumberjack_json_device"
 
-Lumberjack.deprecation_mode = "raise"
+Lumberjack.deprecation_mode = :raise
 Lumberjack.raise_logger_errors = true
 
 RSpec.configure do |config|
