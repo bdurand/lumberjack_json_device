@@ -118,7 +118,7 @@ module Lumberjack
     # @option options [Boolean] :utc If true, all times will be converted to UTC before formatting.
     def initialize(options = {}, deprecated_options = nil)
       unless options.is_a?(Hash)
-        Lumberjack::Utils.deprecated(:new, "Passing a stream or device as the first argument is no longer supported. Specify the output stream in the :output key of the options hash.") do
+        Lumberjack::Utils.deprecated(:new, "Passing a stream or device as the first argument is no longer supported and will be removed in version 3.1; specify the output stream in the :output key of the options hash.") do
           options = (deprecated_options || {}).merge(output: options)
         end
       end
