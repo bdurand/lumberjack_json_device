@@ -45,9 +45,9 @@ RSpec.describe Lumberjack::JsonDevice do
       expect(device.dev).to eq output
     end
 
-    it "can specify a LoggerFile device" do
+    it "can specify a LogFile device" do
       log_file_path = Tempfile.new("logfile").path
-      log_file = Lumberjack::Device::LoggerFile.new(log_file_path)
+      log_file = Lumberjack::Device::LogFile.new(log_file_path)
       begin
         device = Lumberjack::JsonDevice.new(output: log_file)
         expect(device.dev).to eq log_file.dev

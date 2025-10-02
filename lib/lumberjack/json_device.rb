@@ -289,7 +289,7 @@ module Lumberjack
         output
       elsif output.is_a?(String) || (defined?(Pathname) && output.is_a?(Pathname))
         options = options.slice(:binmode, :autoflush, :shift_age, :shift_size, :shift_period_suffix)
-        Lumberjack::Device::LoggerFile.new(output, options)
+        Lumberjack::Device::LogFile.new(output, options)
       else
         if output == :stdout
           output = $stdout
