@@ -1,12 +1,102 @@
+# frozen_string_literal: true
+
 require "spec_helper"
 
 RSpec.describe Lumberjack::JsonDevice do
   let(:output) { StringIO.new }
   let(:entry) { Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar", "baz" => "boo") }
 
+  describe "VERSION" do
+    it "has a version number" do
+      expect(Lumberjack::JsonDevice::VERSION).not_to be nil
+    end
+  end
+
+  describe "registry" do
+    it "should register the device" do
+      expect(Lumberjack::DeviceRegistry.device_class(:json)).to eq(Lumberjack::JsonDevice)
+    end
+  end
+
+  describe "output stream" do
+    it "outputs to STDOUT by default" do
+      device = Lumberjack::JsonDevice.new
+      expect(device.dev).to eq($stdout)
+    end
+
+    it "outputs to the stream specified in the :output option" do
+      device = Lumberjack::JsonDevice.new(output: output)
+      expect(device.dev).to eq output
+    end
+
+    it "outputs to the file in the :output option" do
+      log_file_path = Tempfile.new("logfile").path
+      begin
+        device = Lumberjack::JsonDevice.new(output: log_file_path)
+        expect(device.dev.path).to eq log_file_path
+      ensure
+        File.delete(log_file_path)
+      end
+    end
+
+    it "can specify a Writer device" do
+      writer = Lumberjack::Device::Writer.new(output)
+      device = Lumberjack::JsonDevice.new(output: writer)
+      expect(device.dev).to eq output
+    end
+
+    it "can specify a LogFile device" do
+      log_file_path = Tempfile.new("logfile").path
+      log_file = Lumberjack::Device::LogFile.new(log_file_path)
+      begin
+        device = Lumberjack::JsonDevice.new(output: log_file)
+        expect(device.dev).to eq log_file.dev
+      ensure
+        log_file.close
+        File.delete(log_file_path)
+      end
+    end
+
+    it "can specify the stream as the first argument (deprecated)" do
+      Lumberjack::Utils.with_deprecation_mode(:silent) do
+        device = Lumberjack::JsonDevice.new(output: output, pretty: true)
+        expect(device.dev).to eq output
+        expect(device.pretty?).to be true
+      end
+    end
+
+    it "can specify :stdout" do
+      save_stdout = $stdout
+      stdout = StringIO.new
+      device = nil
+      begin
+        $stdout = stdout
+        device = Lumberjack::JsonDevice.new(output: :stdout)
+      ensure
+        $stdout = save_stdout
+      end
+
+      expect(device.dev).to eq stdout
+    end
+
+    it "can specify :stderr" do
+      save_stderr = $stderr
+      stderr = StringIO.new
+      device = nil
+      begin
+        $stderr = stderr
+        device = Lumberjack::JsonDevice.new(output: :stderr)
+      ensure
+        $stderr = save_stderr
+      end
+
+      expect(device.dev).to eq stderr
+    end
+  end
+
   describe "entry_as_json" do
     it "should have a default mapping of the entry fields" do
-      device = Lumberjack::JsonDevice.new(output)
+      device = Lumberjack::JsonDevice.new(output: output)
       data = device.entry_as_json(entry)
       expect(data).to eq({
         "time" => entry.time.strftime("%Y-%m-%dT%H:%M:%S.%6N%z"),
@@ -14,7 +104,28 @@ RSpec.describe Lumberjack::JsonDevice do
         "progname" => entry.progname,
         "pid" => entry.pid,
         "message" => entry.message,
-        "tags" => entry.tags
+        "attributes" => entry.attributes
+      })
+    end
+
+    it "can map attributes to tags for compatibility with release < 3.0" do
+      mapping = {
+        time: true,
+        severity: true,
+        progname: true,
+        pid: true,
+        message: true,
+        attributes: ["tags"]
+      }
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({
+        "time" => entry.time.strftime("%Y-%m-%dT%H:%M:%S.%6N%z"),
+        "severity" => entry.severity_label,
+        "progname" => entry.progname,
+        "pid" => entry.pid,
+        "message" => entry.message,
+        "tags" => entry.attributes
       })
     end
 
@@ -22,57 +133,57 @@ RSpec.describe Lumberjack::JsonDevice do
       mapping = {
         message: "message"
       }
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({"message" => entry.message})
     end
 
-    it "should not include nil tags" do
+    it "should not include nil attributes" do
       mapping = {
         message: "message",
         thread: ["logger", "thread"],
-        tags: "tags"
+        attributes: "attributes"
       }
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar", "baz" => nil)
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
-      expect(data).to eq({"message" => entry.message, "tags" => {"foo" => "bar"}})
+      expect(data).to eq({"message" => entry.message, "attributes" => {"foo" => "bar"}})
     end
 
-    it "should not include empty hashes in tags" do
+    it "should not include empty hashes in attributes" do
       mapping = {
         message: "message",
         thread: ["logger", "thread"],
-        tags: "tags"
+        attributes: "attributes"
       }
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar", "baz" => {})
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
-      expect(data).to eq({"message" => entry.message, "tags" => {"foo" => "bar"}})
+      expect(data).to eq({"message" => entry.message, "attributes" => {"foo" => "bar"}})
     end
 
-    it "should not include empty arrays in tags" do
+    it "should not include empty arrays in attributes" do
       mapping = {
         message: "message",
         thread: ["logger", "thread"],
-        tags: "tags"
+        attributes: "attributes"
       }
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar", "baz" => [])
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
-      expect(data).to eq({"message" => entry.message, "tags" => {"foo" => "bar"}})
+      expect(data).to eq({"message" => entry.message, "attributes" => {"foo" => "bar"}})
     end
 
-    it "should include false tags" do
+    it "should include false attributes" do
       mapping = {
         message: "message",
         thread: ["logger", "thread"],
-        tags: "tags"
+        attributes: "attributes"
       }
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar", "baz" => false)
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
-      expect(data).to eq({"message" => entry.message, "tags" => {"foo" => "bar", "baz" => false}})
+      expect(data).to eq({"message" => entry.message, "attributes" => {"foo" => "bar", "baz" => false}})
     end
 
     it "should be able to map to custom JSON fields" do
@@ -82,9 +193,9 @@ RSpec.describe Lumberjack::JsonDevice do
         progname: "app",
         pid: "pid",
         message: "message",
-        tags: "payload"
+        attributes: "payload"
       }
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
         "timestamp" => entry.time.strftime("%Y-%m-%dT%H:%M:%S.%6N%z"),
@@ -92,21 +203,21 @@ RSpec.describe Lumberjack::JsonDevice do
         "app" => entry.progname,
         "pid" => entry.pid,
         "message" => entry.message,
-        "payload" => entry.tags
+        "payload" => entry.attributes
       })
     end
 
-    it "should be able to pull tags out to the main JSON document" do
+    it "should be able to pull attributes out to the main JSON document" do
       mapping = {
         time: "timestamp",
         severity: "level",
         progname: "app",
         pid: "pid",
         message: "message",
-        tags: "payload",
+        attributes: "payload",
         foo: "custom"
       }
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
         "timestamp" => entry.time.strftime("%Y-%m-%dT%H:%M:%S.%6N%z"),
@@ -126,15 +237,15 @@ RSpec.describe Lumberjack::JsonDevice do
         progname: ["process", "name"],
         pid: "process.pid",
         message: ["payload", "message"],
-        tags: ["payload", "tags"]
+        attributes: ["payload", "attributes"]
       }
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
         "timestamp" => entry.time.strftime("%Y-%m-%dT%H:%M:%S.%6N%z"),
         "level" => entry.severity_label,
         "process" => {"name" => entry.progname, "pid" => entry.pid},
-        "payload" => {"message" => entry.message, "tags" => entry.tags}
+        "payload" => {"message" => entry.message, "attributes" => entry.attributes}
       })
     end
 
@@ -144,7 +255,7 @@ RSpec.describe Lumberjack::JsonDevice do
         severity: "level",
         message: lambda { |m| {text: m, size: m.size} }
       }
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
         "timestamp" => entry.time.to_i,
@@ -159,20 +270,20 @@ RSpec.describe Lumberjack::JsonDevice do
         severity: true,
         message: true,
         "foo.bar": true,
-        tags: true
+        attributes: true
       }
-      tags = Lumberjack::Utils.flatten_tags({
+      attributes = Lumberjack::Utils.flatten_attributes({
         "foo" => {"bar" => "boo"},
         "baz" => "bip"
       })
-      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, attributes)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
         "severity" => entry.severity_label,
         "message" => entry.message,
         "foo" => {"bar" => "boo"},
-        "tags" => {
+        "attributes" => {
           "baz" => "bip"
         }
       })
@@ -185,7 +296,7 @@ RSpec.describe Lumberjack::JsonDevice do
         progname: nil
       }
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar")
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
         "severity" => entry.severity_label,
@@ -200,7 +311,7 @@ RSpec.describe Lumberjack::JsonDevice do
         progname: false
       }
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, "foo" => "bar")
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
         "severity" => entry.severity_label,
@@ -208,24 +319,24 @@ RSpec.describe Lumberjack::JsonDevice do
       })
     end
 
-    it "should nest tags in the JSON document using dot syntax" do
+    it "should nest attributes in the JSON document using dot syntax" do
       mapping = {
         severity: true,
         message: true,
-        tags: true
+        attributes: true
       }
-      tags = {
+      attributes = {
         "bip" => "bap",
         "foo.bar" => "boo",
         "mip" => "map"
       }
-      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, attributes)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
         "severity" => entry.severity_label,
         "message" => entry.message,
-        "tags" => {
+        "attributes" => {
           "bip" => "bap",
           "foo" => {"bar" => "boo"},
           "mip" => "map"
@@ -233,19 +344,18 @@ RSpec.describe Lumberjack::JsonDevice do
       })
     end
 
-    it "moves tags to the root level if the tags key is set to '*'" do
+    it "moves attributes to the root level if the attributes key is set to '*'" do
       mapping = {
         severity: true,
         message: true,
-        tags: "*"
+        attributes: "*"
       }
-      tags = {
-        "severity" => "bap",
+      attributes = {
         "foo.bar" => "boo",
         "mip" => "map"
       }
-      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, attributes)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
         "severity" => entry.severity_label,
@@ -255,24 +365,45 @@ RSpec.describe Lumberjack::JsonDevice do
       })
     end
 
-    it "converts tags names to strings" do
+    it "cannot override explicit root values with splat attributes" do
       mapping = {
         severity: true,
         message: true,
-        tags: true
+        attributes: "*"
       }
-      tags = {
-        "bip" => "bap",
-        :"foo.bar" => "boo",
-        "mip" => "map"
+      attributes = {
+        "severity" => "fatal",
+        "message" => "Go west young man",
+        "foo" => "bar"
       }
-      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, attributes)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
         "severity" => entry.severity_label,
         "message" => entry.message,
-        "tags" => {
+        "foo" => "bar"
+      })
+    end
+
+    it "converts attributes names to strings" do
+      mapping = {
+        severity: true,
+        message: true,
+        attributes: true
+      }
+      attributes = {
+        "bip" => "bap",
+        :"foo.bar" => "boo",
+        "mip" => "map"
+      }
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, attributes)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({
+        "severity" => entry.severity_label,
+        "message" => entry.message,
+        "attributes" => {
           "bip" => "bap",
           "foo" => {"bar" => "boo"},
           "mip" => "map"
@@ -280,44 +411,44 @@ RSpec.describe Lumberjack::JsonDevice do
       })
     end
 
-    it "dereferences nested tags" do
+    it "dereferences nested attributes" do
       mapping = {
         severity: true,
         message: true,
-        tags: true
+        attributes: true
       }
-      tags = {
+      attributes = {
         "foo.bar.baz" => "boo",
         "mip" => {"mop.mip" => "map"}
       }
-      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, attributes)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
       data = device.entry_as_json(entry)
       expect(data).to eq({
         "severity" => entry.severity_label,
         "message" => entry.message,
-        "tags" => {
+        "attributes" => {
           "foo" => {"bar" => {"baz" => "boo"}},
           "mip" => {"mop" => {"mip" => "map"}}
         }
       })
     end
 
-    it "can handle mixed dot notation and structured tags with dot notation tags first" do
+    it "can handle mixed dot notation and structured attributes with dot notation attributes first" do
       mapping = {
         severity: true,
         message: true,
-        tags: true
+        attributes: true
       }
-      tags = {
+      attributes = {
         "foo.bar" => "baz",
         "foo" => {"bip" => "bop"},
         "foo.quz" => {"wap.woop" => "wop"}
       }
-      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
-      expanded_tags = device.entry_as_json(entry)["tags"]
-      expect(expanded_tags).to eq({
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, attributes)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
+      expanded_attributes = device.entry_as_json(entry)["attributes"]
+      expect(expanded_attributes).to eq({
         "foo" => {
           "bar" => "baz",
           "bip" => "bop",
@@ -326,21 +457,21 @@ RSpec.describe Lumberjack::JsonDevice do
       })
     end
 
-    it "can handle mixed dot notation and structured tags with structured tags first" do
+    it "can handle mixed dot notation and structured attributes with structured attributes first" do
       mapping = {
         severity: true,
         message: true,
-        tags: true
+        attributes: true
       }
-      tags = {
+      attributes = {
         "foo" => {"bar" => "baz"},
         "foo.bip" => "bop",
         "foo.quz" => {"wap.woop" => "wop"}
       }
-      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, tags)
-      device = Lumberjack::JsonDevice.new(output, mapping: mapping)
-      expanded_tags = device.entry_as_json(entry)["tags"]
-      expect(expanded_tags).to eq({
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message", "test", 12345, attributes)
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
+      expanded_attributes = device.entry_as_json(entry)["attributes"]
+      expect(expanded_attributes).to eq({
         "foo" => {
           "bar" => "baz",
           "bip" => "bop",
@@ -350,32 +481,11 @@ RSpec.describe Lumberjack::JsonDevice do
     end
   end
 
-  describe "device wrapping" do
-    it "should wrap a device" do
-      writer = Lumberjack::Device::Writer.new(output)
-      device = Lumberjack::JsonDevice.new(writer)
-      device.write(entry)
-      device.write(entry)
-      device.flush
-      lines = output.string.chomp.split(Lumberjack::LINE_SEPARATOR)
-      data = device.entry_as_json(entry)
-      expect(lines).to eq [JSON.generate(data)] * 2
-    end
-
-    it "should wrap a stream" do
-      device = Lumberjack::JsonDevice.new(output)
-      device.write(entry)
-      device.write(entry)
-      device.flush
-      lines = output.string.chomp.split(Lumberjack::LINE_SEPARATOR)
-      data = device.entry_as_json(entry)
-      expect(lines).to eq [JSON.generate(data)] * 2
-    end
-
+  describe "device output" do
     it "should not write out empty log messages" do
       blank_entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "", "test", 12345, {})
       nil_entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, nil, "test", 12345, nil)
-      device = Lumberjack::JsonDevice.new(output)
+      device = Lumberjack::JsonDevice.new(output: output)
       device.write(blank_entry)
       device.write(nil_entry)
       device.flush
@@ -384,19 +494,22 @@ RSpec.describe Lumberjack::JsonDevice do
     end
 
     it "should write one document per line" do
-      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "line_1\nline_2", "test", 12345, "foo" => {"bar" => "line_1\nline_2"})
-      device = Lumberjack::JsonDevice.new(output)
-      device.write(entry)
+      entry_1 = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "line_1\nline_2", "test", 12345, "foo" => {"bar" => "line_1\nline_2"})
+      entry_2 = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "entry_2", "test", 12345, nil)
+      device = Lumberjack::JsonDevice.new(output: output)
+      device.write(entry_1)
+      device.write(entry_2)
       device.flush
       lines = output.string.chomp.split("\n")
       data = device.entry_as_json(entry)
-      expect(lines.length).to eq 1
-      expect(lines.first).to eq JSON.generate(data)
+      expect(lines.length).to eq 2
+      expect(JSON.parse(lines.first)["message"]).to eq "line_1\nline_2"
+      expect(JSON.parse(lines.last)["message"]).to eq "entry_2"
     end
 
     it "should allow writing out pretty JSON" do
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "pretty", "test", 12345, "foo" => {"bar" => "baz"})
-      device = Lumberjack::JsonDevice.new(output, pretty: true)
+      device = Lumberjack::JsonDevice.new(output: output, pretty: true)
       device.write(entry)
       device.flush
       lines = output.string.chomp
@@ -404,14 +517,14 @@ RSpec.describe Lumberjack::JsonDevice do
       expect(lines).to eq JSON.pretty_generate(data)
     end
 
-    it "should write out dot notation tags from log messages as nested JSON" do
-      device = Lumberjack::JsonDevice.new(output)
+    it "should write out dot notation attributes from log messages as nested JSON" do
+      device = Lumberjack::JsonDevice.new(output: output)
       logger = Lumberjack::Logger.new(device)
       logger.info("message", "foo.bar" => "baz", "foo.baz" => "boo")
       logger.flush
       json = JSON.parse(output.string.chomp.split(Lumberjack::LINE_SEPARATOR).last)
-      expect(json.dig("tags", "foo", "bar")).to eq "baz"
-      expect(json.dig("tags", "foo", "baz")).to eq "boo"
+      expect(json.dig("attributes", "foo", "bar")).to eq "baz"
+      expect(json.dig("attributes", "foo", "baz")).to eq "boo"
     end
   end
 
@@ -420,7 +533,7 @@ RSpec.describe Lumberjack::JsonDevice do
       formatter = Lumberjack::Formatter.new
       formatter.add(String) { |obj| "#{obj}!" }
       formatter.add(Time) { |obj| obj.iso8601 }
-      device = Lumberjack::JsonDevice.new(output, formatter: formatter, mapping: {time: "time", message: "message", foo: "foo"})
+      device = Lumberjack::JsonDevice.new(output: output, formatter: formatter, mapping: {time: "time", message: "message", foo: "foo"})
       device.write(entry)
       line = output.string.chomp
       expect(line).to eq JSON.generate("time" => entry.time.iso8601, "message" => "message!", "foo" => "bar!")
@@ -429,21 +542,21 @@ RSpec.describe Lumberjack::JsonDevice do
 
   describe "datetime_format" do
     it "should get and set the datetime_format" do
-      device = Lumberjack::JsonDevice.new(output, mapping: {time: "time", message: "message"})
+      device = Lumberjack::JsonDevice.new(output: output, mapping: {time: "time", message: "message"})
       expect(device.datetime_format).to eq "%Y-%m-%dT%H:%M:%S.%6N%z"
       device.datetime_format = "%Y-%m-%d--%H.%M.%S"
       expect(device.datetime_format).to eq "%Y-%m-%d--%H.%M.%S"
     end
 
     it "should get and set the datetime_format in the constructor" do
-      device = Lumberjack::JsonDevice.new(output, mapping: {time: "time", message: "message"}, datetime_format: "%Y-%m-%d")
+      device = Lumberjack::JsonDevice.new(output: output, mapping: {time: "time", message: "message"}, datetime_format: "%Y-%m-%d")
       expect(device.datetime_format).to eq "%Y-%m-%d"
       expect(device.datetime_format).to eq "%Y-%m-%d"
     end
 
     it "should apply the datetime_format to all datetime fields in the JSON" do
       format = "%Y-%m-%d--%H.%M.%S"
-      device = Lumberjack::JsonDevice.new(output, mapping: {time: "time", message: "message", progname: "app"})
+      device = Lumberjack::JsonDevice.new(output: output, mapping: {time: "time", message: "message", progname: "app"})
       device.datetime_format = format
       time_1 = Time.now
       time_2 = Time.now
@@ -453,11 +566,21 @@ RSpec.describe Lumberjack::JsonDevice do
       line = output.string.chomp
       expect(JSON.parse(line)).to eq({"time" => time_1.strftime(format), "message" => time_2.strftime(format), "app" => "test"})
     end
+
+    it "can force UTC values" do
+      device = Lumberjack::JsonDevice.new(output: output, utc: true)
+      time = Time.parse("2025-08-27T12:45:56-0700")
+      entry = Lumberjack::LogEntry.new(time, Logger::INFO, "test", "app", 12345, {})
+      device.write(entry)
+      device.flush
+      line = output.string.chomp
+      expect(JSON.parse(line)["time"]).to eq time.utc.strftime("%Y-%m-%dT%H:%M:%S.%6N%z")
+    end
   end
 
   describe "mapping" do
     it "should be able to change the mapping" do
-      device = Lumberjack::JsonDevice.new(output, mapping: {message: "message"})
+      device = Lumberjack::JsonDevice.new(output: output, mapping: {message: "message"})
       data = device.entry_as_json(entry)
       expect(data).to eq({"message" => entry.message})
 
@@ -467,14 +590,14 @@ RSpec.describe Lumberjack::JsonDevice do
     end
 
     it "should be able to add to the mapping" do
-      device = Lumberjack::JsonDevice.new(output, mapping: {message: "message"})
+      device = Lumberjack::JsonDevice.new(output: output, mapping: {message: "message"})
       device.mapping = device.map(message: "text", severity: "level")
       data = device.entry_as_json(entry)
       expect(data).to eq({"text" => entry.message, "level" => "INFO"})
     end
 
     it "should remove from the mapping with falsey value" do
-      device = Lumberjack::JsonDevice.new(output, mapping: {message: "message"})
+      device = Lumberjack::JsonDevice.new(output: output, mapping: {message: "message"})
       device.mapping = device.map(message: false, severity: "level")
       data = device.entry_as_json(entry)
       expect(data).to eq({"level" => "INFO"})
@@ -492,7 +615,7 @@ RSpec.describe Lumberjack::JsonDevice do
 
     it "calls as_json on the message" do
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, obj, nil, 12345, {})
-      device = Lumberjack::JsonDevice.new(output, mapping: {message: "message"})
+      device = Lumberjack::JsonDevice.new(output: output, mapping: {message: "message"})
       device.write(entry)
       line = output.string.chomp
       expect(JSON.parse(line)["message"]).to eq({"foo" => "bar"})
@@ -500,7 +623,7 @@ RSpec.describe Lumberjack::JsonDevice do
 
     it "calls as_json on the progname" do
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", obj, 12345, {})
-      device = Lumberjack::JsonDevice.new(output, mapping: {progname: "progname"})
+      device = Lumberjack::JsonDevice.new(output: output, mapping: {progname: "progname"})
       device.write(entry)
       line = output.string.chomp
       expect(JSON.parse(line)["progname"]).to eq({"foo" => "bar"})
@@ -508,28 +631,28 @@ RSpec.describe Lumberjack::JsonDevice do
 
     it "calls as_json on the attributes" do
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", "app", 12345, {"a" => obj})
-      device = Lumberjack::JsonDevice.new(output)
+      device = Lumberjack::JsonDevice.new(output: output)
       device.write(entry)
       line = output.string.chomp
-      expect(JSON.parse(line)["tags"]).to eq({"a" => {"foo" => "bar"}})
+      expect(JSON.parse(line)["attributes"]).to eq({"a" => {"foo" => "bar"}})
     end
 
     it "calls as_json on nested values" do
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", "app", 12345, {"a" => ["d", {"b" => obj}]})
-      device = Lumberjack::JsonDevice.new(output)
+      device = Lumberjack::JsonDevice.new(output: output)
       device.write(entry)
       line = output.string.chomp
-      expect(JSON.parse(line)["tags"]).to eq({"a" => ["d", {"b" => {"foo" => "bar"}}]})
+      expect(JSON.parse(line)["attributes"]).to eq({"a" => ["d", {"b" => {"foo" => "bar"}}]})
     end
 
     it "ignores self references in hashes" do
-      circular_reference = {"one" => 1}
-      circular_reference["self"] = circular_reference
+      circular_reference = {"one" => []}
+      circular_reference["one"] << circular_reference
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", "app", 12345, circular_reference)
-      device = Lumberjack::JsonDevice.new(output)
+      device = Lumberjack::JsonDevice.new(output: output)
       device.write(entry)
       line = output.string.chomp
-      expect(JSON.parse(line)["tags"]).to eq({"one" => 1})
+      expect(JSON.parse(line)["attributes"]).to eq({"one" => [{"one" => nil}]})
     end
 
     it "records an error value if the entry cannot be serialized" do
@@ -542,21 +665,21 @@ RSpec.describe Lumberjack::JsonDevice do
       begin
         $stderr = StringIO.new
         entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", "app", 12345, "foo" => obj)
-        device = Lumberjack::JsonDevice.new(output)
+        device = Lumberjack::JsonDevice.new(output: output)
         device.write(entry)
       ensure
         $stderr = save_stderr
       end
 
       line = output.string.chomp
-      expect(JSON.parse(line)["tags"]["foo"]).to include("Error serializing Object to JSON: SystemStackError")
+      expect(JSON.parse(line)["attributes"]["foo"]).to include("Error serializing Object to JSON: SystemStackError")
     end
   end
 
   describe "post_processor" do
     it "can provide a post processor to modify the log entry before writing" do
       post_processor = ->(data) { data.transform_keys(&:upcase) }
-      device = Lumberjack::JsonDevice.new(output, post_processor: post_processor)
+      device = Lumberjack::JsonDevice.new(output: output, post_processor: post_processor)
       device.write(entry)
       device.flush
       json = JSON.parse(output.string.chomp)
@@ -566,7 +689,7 @@ RSpec.describe Lumberjack::JsonDevice do
 
     it "ignores the post processor result if it is not a hash" do
       post_processor = ->(data) { data.delete("message") }
-      device = Lumberjack::JsonDevice.new(output, post_processor: post_processor)
+      device = Lumberjack::JsonDevice.new(output: output, post_processor: post_processor)
       device.write(entry)
       device.flush
       json = JSON.parse(output.string.chomp)
