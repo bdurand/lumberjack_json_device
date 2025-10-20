@@ -646,13 +646,13 @@ RSpec.describe Lumberjack::JsonDevice do
     end
 
     it "ignores self references in hashes" do
-      circular_reference = {"one" => 1}
-      circular_reference["self"] = circular_reference
+      circular_reference = {"one" => []}
+      circular_reference["one"] << circular_reference
       entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", "app", 12345, circular_reference)
       device = Lumberjack::JsonDevice.new(output: output)
       device.write(entry)
       line = output.string.chomp
-      expect(JSON.parse(line)["attributes"]).to eq({"one" => 1})
+      expect(JSON.parse(line)["attributes"]).to eq({"one" => [{"one" => nil}]})
     end
 
     it "records an error value if the entry cannot be serialized" do

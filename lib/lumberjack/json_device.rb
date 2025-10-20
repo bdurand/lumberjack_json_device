@@ -356,7 +356,7 @@ module Lumberjack
       return value if JSON_NATIVE_CLASSES.include?(value.class)
       return nil if seen&.include?(value.object_id)
 
-      # Check if the as_json method is defined takes no parameters
+      # Check if the as_json method is defined and takes no parameters
       as_json_arity = value.method(:as_json).arity if !value.nil? && value.respond_to?(:as_json)
 
       if as_json_arity == 0 || as_json_arity == -1
