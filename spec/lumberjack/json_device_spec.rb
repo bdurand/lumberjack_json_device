@@ -457,6 +457,20 @@ RSpec.describe Lumberjack::JsonDevice do
       })
     end
 
+    it "does not raise an error when a nested mapping collides with a scalar mapping" do
+      mapping = {
+        progname: "process",
+        pid: "process.pid",
+        message: "message"
+      }
+      device = Lumberjack::JsonDevice.new(output: output, mapping: mapping)
+      data = device.entry_as_json(entry)
+      expect(data).to eq({
+        "message" => entry.message,
+        "process" => {"pid" => entry.pid}
+      })
+    end
+
     it "can handle mixed dot notation and structured attributes with structured attributes first" do
       mapping = {
         severity: true,
@@ -515,6 +529,38 @@ RSpec.describe Lumberjack::JsonDevice do
       lines = output.string.chomp
       data = device.entry_as_json(entry)
       expect(lines).to eq JSON.pretty_generate(data)
+    end
+
+    it "does not interleave JSON documents written from multiple threads" do
+      slow_device_class = Class.new(Lumberjack::Device) do
+        def initialize(io)
+          @io = io
+        end
+
+        def write(string)
+          string.each_char do |char|
+            @io.write(char)
+            Thread.pass
+          end
+        end
+      end
+
+      device = Lumberjack::JsonDevice.new(output: slow_device_class.new(output))
+      threads = 4.times.collect do |i|
+        Thread.new do
+          10.times do |j|
+            entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message #{i}-#{j}", "test", 12345, "thread" => i)
+            device.write(entry)
+          end
+        end
+      end
+      threads.each(&:join)
+
+      lines = output.string.chomp.split("\n")
+      expect(lines.length).to eq 40
+      lines.each do |line|
+        expect { JSON.parse(line) }.not_to raise_error
+      end
     end
 
     it "should write out dot notation attributes from log messages as nested JSON" do
@@ -602,6 +648,25 @@ RSpec.describe Lumberjack::JsonDevice do
       data = device.entry_as_json(entry)
       expect(data).to eq({"level" => "INFO"})
     end
+
+    it "applies mapping changes atomically to entries being written concurrently" do
+      device = Lumberjack::JsonDevice.new(output: output, mapping: {message: "message", severity: "level"})
+      results = []
+      done = false
+      reader = Thread.new do
+        results << device.entry_as_json(entry).keys.sort until done
+      end
+
+      100.times do
+        device.mapping = {message: "text", severity: "severity"}
+        device.mapping = {message: "message", severity: "level"}
+      end
+      done = true
+      reader.join
+
+      # Each entry must reflect exactly one mapping, never a mix of two mappings.
+      expect(results.uniq - [["level", "message"], ["severity", "text"]]).to eq []
+    end
   end
 
   describe "as_json support" do
@@ -653,6 +718,19 @@ RSpec.describe Lumberjack::JsonDevice do
       device.write(entry)
       line = output.string.chomp
       expect(JSON.parse(line)["attributes"]).to eq({"one" => [{"one" => nil}]})
+    end
+
+    it "serializes shared references that are not circular" do
+      shared = {"x" => 1}
+      attributes = {"list" => [shared, shared], "nested" => {"a" => shared, "b" => shared}}
+      entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "test", "app", 12345, attributes)
+      device = Lumberjack::JsonDevice.new(output: output)
+      device.write(entry)
+      line = output.string.chomp
+      expect(JSON.parse(line)["attributes"]).to eq({
+        "list" => [{"x" => 1}, {"x" => 1}],
+        "nested" => {"a" => {"x" => 1}, "b" => {"x" => 1}}
+      })
     end
 
     it "records an error value if the entry cannot be serialized" do
