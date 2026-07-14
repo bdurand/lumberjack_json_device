@@ -4,6 +4,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## 3.0.1
+
+### Fixed
+
+- Objects that appear more than once in a log entry (shared references that are not circular) are now serialized in full instead of being replaced with `null`. Only true circular references are replaced with `null`.
+- Log entries are now written to the output stream inside a mutex so that entries written from multiple threads cannot be interleaved, which could produce unparseable JSON lines.
+- Changing the mapping at runtime is now atomic with respect to entries being written on other threads. Previously a concurrent mapping change could produce an entry with a mix of the old and new mappings.
+- Fixed an `IndexError` when a mapping nests a field under a key that another field maps to as a scalar value (e.g. `{progname: "process", pid: "process.pid"}`). The nested structure now replaces the scalar value instead of raising an error.
+- Added an explicit `require "set"` rather than relying on it being transitively loaded.
+
 ## 3.0.0
 
 ### Added

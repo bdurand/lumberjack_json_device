@@ -2,6 +2,7 @@
 
 require "lumberjack"
 require "json"
+require "set"
 require "time"
 
 # Lumberjack is a simple, powerful, and fast logging library for Ruby that
@@ -69,6 +70,12 @@ module Lumberjack
     # Valid options that can be passed to the JsonDevice constructor.
     JSON_OPTIONS = [:output, :mapping, :formatter, :datetime_format, :post_processor, :pretty, :utc].freeze
     private_constant :JSON_OPTIONS
+
+    # Immutable snapshot of a parsed mapping. The mapping is published as a single frozen
+    # object so that entries being written concurrently with a mapping change always see
+    # a consistent view of the mapping.
+    MappedKeys = Struct.new(:time, :severity, :message, :progname, :pid, :attributes, :custom)
+    private_constant :MappedKeys
 
     # Register the JsonDevice with the device registry for easier instantiation.
     DeviceRegistry.add(:json, self)
@@ -152,7 +159,9 @@ module Lumberjack
 
       data = entry_as_json(entry)
       json = @pretty ? JSON.pretty_generate(data) : JSON.generate(data)
-      @output.write("#{json}\n")
+      @mutex.synchronize do
+        @output.write("#{json}\n")
+      end
     end
 
     # Get the underlying device from the output stream.
@@ -200,26 +209,33 @@ module Lumberjack
     #   If the value is `false`, the field will not be included in the JSON output.
     # @return [void]
     def mapping=(mapping)
-      @mutex.synchronize do
-        keys = {}
-        mapping.each do |key, value|
-          if value == true
-            value = key.to_s.split(".")
-            value = value.first if value.size == 1
-          end
-          keys[key.to_sym] = value if value
+      keys = {}
+      mapping.each do |key, value|
+        if value == true
+          value = key.to_s.split(".")
+          value = value.first if value.size == 1
         end
+        keys[key.to_sym] = value if value
+      end
 
-        @time_key = keys.delete(:time)
-        @severity_key = keys.delete(:severity)
-        @message_key = keys.delete(:message)
-        @progname_key = keys.delete(:progname)
-        @pid_key = keys.delete(:pid)
-        @attributes_key = keys.delete(:attributes)
-        @custom_keys = keys.map do |name, key|
-          [name.to_s.split("."), key]
-        end.to_h
+      custom_keys = keys.each_with_object({}) do |(name, key), hash|
+        next if DEFAULT_MAPPING.include?(name)
 
+        hash[name.to_s.split(".")] = key
+      end
+
+      mapped_keys = MappedKeys.new(
+        keys[:time],
+        keys[:severity],
+        keys[:message],
+        keys[:progname],
+        keys[:pid],
+        keys[:attributes],
+        custom_keys.freeze
+      ).freeze
+
+      @mutex.synchronize do
+        @keys = mapped_keys
         @mapping = mapping
       end
     end
@@ -242,17 +258,18 @@ module Lumberjack
     # @param entry [Lumberjack::LogEntry] The log entry to convert.
     # @return [Hash] A hash representing the log entry in JSON format.
     def entry_as_json(entry)
+      keys = @keys
       data = {}
-      set_attribute(data, @time_key, entry.time) if @time_key
-      set_attribute(data, @severity_key, entry.severity_label) if @severity_key
-      set_attribute(data, @message_key, json_safe(entry.message)) if @message_key
-      set_attribute(data, @progname_key, json_safe(entry.progname)) if @progname_key && entry.progname
-      set_attribute(data, @pid_key, entry.pid) if @pid_key
+      set_attribute(data, keys.time, entry.time) if keys.time
+      set_attribute(data, keys.severity, entry.severity_label) if keys.severity
+      set_attribute(data, keys.message, json_safe(entry.message)) if keys.message
+      set_attribute(data, keys.progname, json_safe(entry.progname)) if keys.progname && entry.progname
+      set_attribute(data, keys.pid, entry.pid) if keys.pid
 
       attributes = entry.attributes.transform_values { |value| json_safe(value) } if entry.attributes
 
-      if @custom_keys.size > 0 && attributes && !attributes&.empty?
-        @custom_keys.each do |name, key|
+      if keys.custom.size > 0 && attributes && !attributes&.empty?
+        keys.custom.each do |name, key|
           name = name.is_a?(Array) ? name.join(".") : name.to_s
           value = attributes.delete(name)
           next if value.nil?
@@ -262,12 +279,12 @@ module Lumberjack
         end
       end
 
-      if @attributes_key && !attributes&.empty?
+      if keys.attributes && !attributes&.empty?
         attributes = Lumberjack::Utils.expand_attributes(attributes)
-        if @attributes_key == "*"
+        if keys.attributes == "*"
           attributes.each { |k, v| data[k] = v unless data.include?(k) }
         else
-          set_attribute(data, @attributes_key, attributes)
+          set_attribute(data, keys.attributes, attributes)
         end
       end
 
@@ -325,7 +342,7 @@ module Lumberjack
           if key.size == 1
             data[key.first] = value
           else
-            data[key.first] ||= {}
+            data[key.first] = {} unless data[key.first].is_a?(Hash)
             set_attribute(data[key.first], key[1, key.size], value)
           end
         end
@@ -366,10 +383,16 @@ module Lumberjack
       else
         seen ||= Set.new
         seen << value.object_id
-        if value.is_a?(Hash)
-          value.transform_values { |v| json_safe(v, seen) }
-        else
-          value.collect { |v| json_safe(v, seen) }
+        begin
+          if value.is_a?(Hash)
+            value.transform_values { |v| json_safe(v, seen) }
+          else
+            value.collect { |v| json_safe(v, seen) }
+          end
+        ensure
+          # Only track objects on the current traversal path so that shared references
+          # that are not circular are serialized in full.
+          seen.delete(value.object_id)
         end
       end
     rescue SystemStackError, StandardError => e
