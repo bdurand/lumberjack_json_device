@@ -159,9 +159,7 @@ module Lumberjack
 
       data = entry_as_json(entry)
       json = @pretty ? JSON.pretty_generate(data) : JSON.generate(data)
-      @mutex.synchronize do
-        @output.write("#{json}\n")
-      end
+      @output.write("#{json}\n") # thread safety is handled by the underlying output stream
     end
 
     # Get the underlying device from the output stream.
