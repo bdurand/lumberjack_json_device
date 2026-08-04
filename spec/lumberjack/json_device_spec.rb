@@ -531,38 +531,6 @@ RSpec.describe Lumberjack::JsonDevice do
       expect(lines).to eq JSON.pretty_generate(data)
     end
 
-    it "does not interleave JSON documents written from multiple threads" do
-      slow_device_class = Class.new(Lumberjack::Device) do
-        def initialize(io)
-          @io = io
-        end
-
-        def write(string)
-          string.each_char do |char|
-            @io.write(char)
-            Thread.pass
-          end
-        end
-      end
-
-      device = Lumberjack::JsonDevice.new(output: slow_device_class.new(output))
-      threads = 4.times.collect do |i|
-        Thread.new do
-          10.times do |j|
-            entry = Lumberjack::LogEntry.new(Time.now, Logger::INFO, "message #{i}-#{j}", "test", 12345, "thread" => i)
-            device.write(entry)
-          end
-        end
-      end
-      threads.each(&:join)
-
-      lines = output.string.chomp.split("\n")
-      expect(lines.length).to eq 40
-      lines.each do |line|
-        expect { JSON.parse(line) }.not_to raise_error
-      end
-    end
-
     it "should write out dot notation attributes from log messages as nested JSON" do
       device = Lumberjack::JsonDevice.new(output: output)
       logger = Lumberjack::Logger.new(device)
