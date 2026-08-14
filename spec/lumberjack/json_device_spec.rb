@@ -515,7 +515,6 @@ RSpec.describe Lumberjack::JsonDevice do
       device.write(entry_2)
       device.flush
       lines = output.string.chomp.split("\n")
-      data = device.entry_as_json(entry)
       expect(lines.length).to eq 2
       expect(JSON.parse(lines.first)["message"]).to eq "line_1\nline_2"
       expect(JSON.parse(lines.last)["message"]).to eq "entry_2"
